@@ -1,7 +1,7 @@
 
 # Digibyte Address Generator
 
-This repository contains a simple Bitcoin address generator tool built using Node.js and the bitcoinjs-lib library.
+This repository contains a simple Digibyte address generator tool built using Node.js and the bitcoinjs-lib library.
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ node generator.js
 
 2. The script will generate a 24-word mnemonic and display it on the screen.
 
-3. The script will also generate a Bitcoin address and display it on the screen.
+3. The script will also generate a Digibyte address and display it on the screen.
 
 ## Contributing
 
