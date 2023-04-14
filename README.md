@@ -14,21 +14,20 @@ This repository contains a simple Bitcoin address generator tool built using Nod
 
 git clone https://github.com/your-username/bitcoin-address-generator.git
 
-css
+
 
 
 2. Navigate to the repository directory:
 
 cd bitcoin-address-generator
 
-markdown
 
 
 3. Install the required dependencies:
 
 npm install
 
-markdown
+
 
 
 ## Usage
@@ -37,7 +36,7 @@ markdown
 
 node generator.js
 
-css
+
 
 
 2. The script will generate a 24-word mnemonic and display it on the screen.
