@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const bip39 = require('bip39');
-const bitcoin = require('bitcoinjs-lib');
+const bitcoinjs = require('bitcoinjs-lib');
 
 const digibyteNetwork = {
   messagePrefix: '\x19DigiByte Signed Message:\n',
@@ -22,18 +22,14 @@ console.log("Mnemonic (24 words):", mnemonic);
 const seed = bip39.mnemonicToSeedSync(mnemonic);
 
 // Generate a DigiByte wallet using the seed
-const root = bitcoin.bip32.fromSeed(seed, digibyteNetwork);
+const root = bitcoinjs.bip32.fromSeed(seed, digibyteNetwork);
 const path = "m/44'/20'/0'/0/0"; // DigiByte BIP44 path
 const child = root.derivePath(path);
 
 // Generate a DigiByte address
-const { address } = bitcoin.payments.p2pkh({
+const { address } = bitcoinjs.payments.p2pkh({
   pubkey: child.publicKey,
   network: digibyteNetwork,
 });
 
 console.log("DigiByte Address:", address);
-
-
-
-
