@@ -1,6 +1,30 @@
 {
+  "name": "digibyte-address-generator",
+  "version": "2.0.0",
+  "description": "Air-gapped DigiByte cold-storage prep: BIP39 seed, BIP44/49/84/86 addresses, watch-only descriptors. Single-file, zero runtime dependencies.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "dgb-coldprep": "dist/dgb-coldprep.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/core.test.js test/cli.test.js",
+    "start": "node dist/dgb-coldprep.cjs",
+    "verify-dist": "node build.mjs --check"
+  },
   "dependencies": {
-    "bip39": "^3.1.0",
-    "bitcoinjs-lib": "^4.0.5"
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "@scure/base": "2.4.0",
+    "@scure/bip32": "2.4.0",
+    "@scure/bip39": "2.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }
