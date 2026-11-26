@@ -28,6 +28,10 @@ yet been confirmed on real hardware. Do not use it for real funds yet.
 - **DigiByte first, five chains.** One seed produces DigiByte, Bitcoin,
   Litecoin, Dogecoin and Monero wallets, shown one chain per screen with
   DigiByte leading.
+- **Checks the room first.** Before a seed is shown or typed (new seed or
+  recovery drill), a warning screen asks for a plain monitor rather than a
+  smart TV, a direct HDMI cable, a wired keyboard with no wireless dongle,
+  and no cameras in view. You can go back to the menu from it.
 - **24 words, or 24 + 1.** The menu offers a 24-word seed on its own, or a
   24-word seed with a passphrase (the "25th word"), which is then required.
 

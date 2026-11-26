@@ -8,6 +8,8 @@ USB_MNT=/run/holdfast-usb
 # Every chain from the one seed, DigiByte first, three addresses per type so
 # each chain fits on one screen.
 COMMON='--chains all --count 3'
+SHOWN='Your new seed words will be shown on this screen and typed on this keyboard.'
+TYPED='You will type your seed words on this keyboard and see them on this screen.'
 trap '' INT QUIT TSTP HUP
 
 pause() {
@@ -96,6 +98,39 @@ TEXT
 	pause
 }
 
+# Shown before anything that puts seed words on the screen or the keyboard.
+# The device itself has no network or radio, but what is plugged into it
+# might. Returns non-zero if the user goes back to the menu.
+screen_warning() { # $1: what is about to happen to the seed
+	clear
+	printf '\n  Before your seed appears: check the screen and keyboard\n\n'
+	printf '  %s\n' "$1"
+	cat <<'TEXT'
+  Anything that can see the screen or hear the keyboard can steal it.
+
+  Screen    Use a plain computer monitor, not a smart TV. Many smart TVs
+            analyse what is on screen and report it over the network.
+            Connect the HDMI cable straight to the monitor: no capture card,
+            splitter, AV receiver or KVM switch in between.
+
+  Keyboard  Use a wired USB keyboard. A wireless keyboard sends every key
+            over radio. This device has no radio, but a keyboard's USB
+            dongle is one, and it works here. Unplug any dongle.
+
+  Room      No phones, webcams or security cameras that can see the screen
+            or your paper.
+
+TEXT
+	while :; do
+		printf '  Press Enter if all of this is true, or type b to go back to the menu: '
+		read -r answer || return 1
+		case "$answer" in
+		'') return 0 ;;
+		b | B) return 1 ;;
+		esac
+	done
+}
+
 new_seed() { # $1: passphrase option
 	rm -rf "$KIT_DIR"
 	mkdir -p "$KIT_DIR"
@@ -129,9 +164,9 @@ BANNER
 	read -r choice || exit 0
 	clear
 	case "$choice" in
-	1) new_seed --no-passphrase ;;
-	2) new_seed --require-passphrase ;;
-	3) node "$APP" verify $COMMON --qr || pause ;;
+	1) screen_warning "$SHOWN" && new_seed --no-passphrase ;;
+	2) screen_warning "$SHOWN" && new_seed --require-passphrase ;;
+	3) screen_warning "$TYPED" && { node "$APP" verify $COMMON --qr || pause; } ;;
 	4)
 		printf 'Chain (dgb, btc, ltc, doge, xmr) [dgb]: '
 		read -r chain

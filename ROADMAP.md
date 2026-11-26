@@ -25,8 +25,8 @@ seed as fellow proof-of-work chains.
       mandatory dice, 24 or 24+1, one chain per screen.
 - [ ] First boot on real hardware (a Raspberry Pi 3 B+ first), working
       through the checklist in `os/README.md`.
-- [ ] On-screen warning before seed words are shown: use a plain monitor, not
-      a network-connected smart TV, and a wired keyboard.
+- [x] On-screen warning before seed words are shown or typed: use a plain
+      monitor, not a network-connected smart TV, and a wired keyboard.
 - [x] Watch-only kit export from the device: USB stick (written, then
       re-read and compared), and QR codes on screen.
 - [ ] Scan a QR code off a real screen with a phone, and export to a real

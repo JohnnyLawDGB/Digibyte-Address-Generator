@@ -7,9 +7,10 @@ With the Buildroot host directory (for mkfs.vfat and mtools), a blank FAT32
 USB stick is attached and the watch-only kit export is checked end to end.
 
 Checks that the system boots straight into the HoldFast menu with no login or
-shell, that the tool's self-test passes on the target, that the kernel has no
-network interface other than loopback, and that a full ceremony and recovery
-drill complete.
+shell, that a screen-and-keyboard warning comes before any seed and can be
+backed out of, that the tool's self-test passes on the target, that the kernel
+has no network interface other than loopback, and that a full ceremony and
+recovery drill complete.
 """
 import os
 import re
@@ -92,6 +93,15 @@ def page_through(start, qr_for=None):
     fail("too many pages")
 
 
+WARNING = r"type b to go back to the menu: "
+
+
+def past_warning(start):
+    """Acknowledge the screen-and-keyboard warning shown before any seed."""
+    until(WARNING, start=start)
+    send("")
+
+
 def step(name):
     print("ok   " + name, flush=True)
 
@@ -112,6 +122,19 @@ mark = len(buf)
 until(r"Choose 1-6: ", start=mark)
 mark = len(buf)
 send("1")
+until(WARNING, start=mark)
+text = ANSI.sub("", buf[mark:])
+for needle in ("Before your seed appears", "smart TV", "wired USB keyboard", "dongle"):
+    if needle not in text:
+        fail("seed warning does not mention %r" % needle)
+send("b")
+until(r"Choose 1-6: ", start=len(buf))
+if "No active network interfaces" in ANSI.sub("", buf[mark:]):
+    fail("going back from the warning still started the ceremony")
+step("warns about smart TVs and wireless keyboards before a seed, and can go back")
+mark = len(buf)
+send("1")
+past_warning(mark)
 until(r"No active network interfaces", start=mark)
 step("tool sees no network interface")
 until(r"Dice rolls: ", start=mark)
@@ -135,6 +158,10 @@ shown = page_through(mark2, qr_for="DigiByte")
 send("")
 step("ceremony completes (fingerprint %s)" % fp)
 if "DigiByte mainnet Native SegWit receive address #0" not in shown or "\u2588\u2580\u2580\u2580\u2580\u2580\u2588" not in shown:
+    # The console tail printed by fail() is too short to reach this screen.
+    a = shown.find("Show QR codes for DigiByte")
+    b = shown.find("Press Enter for Bitcoin", a)
+    print("--- DigiByte QR screen ---\n" + (shown[a:b] if a >= 0 else "(QR prompt for DigiByte not seen)"))
     fail("QR code for the first DigiByte address was not drawn")
 step("QR code drawn for a public address")
 chains = re.findall(r"Chain:\s+(\w+)", shown)
@@ -168,6 +195,7 @@ mark = len(buf)
 until(r"Choose 1-6: ", start=mark)
 mark = len(buf)
 send("3")
+past_warning(mark)
 until(r"Seed phrase: ", start=mark)
 send(" ".join(words))
 until(r"BIP39 passphrase[^\n]*: ", start=mark)
@@ -182,6 +210,7 @@ mark = len(buf)
 until(r"Choose 1-6: ", start=mark)
 mark = len(buf)
 send("2")
+past_warning(mark)
 until(r"Dice rolls: ", start=mark)
 send("6543216543" * 10)
 until(r"BIP39 passphrase: ", start=mark)
