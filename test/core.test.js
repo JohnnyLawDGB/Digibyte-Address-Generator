@@ -4,6 +4,7 @@ import {
   CHAINS,
   CHAIN_VECTORS,
   DGB_VECTORS,
+  MONERO_VECTOR,
   NETWORKS,
   buildWatchKit,
   checkAddress,
@@ -14,6 +15,7 @@ import {
   mixEntropy,
   mnemonicFromEntropy,
   mnemonicProblem,
+  moneroSeedWords,
   normalizeDice,
   selfTest,
 } from '../src/core.js';
@@ -165,8 +167,8 @@ test('Bitcoin, Litecoin and Dogecoin derive from the same seed with their own pa
   // One seed, one fingerprint, different keys per chain.
   const all = Object.values(CHAINS).map((network) => deriveWallet(ABANDON, '', { network }));
   assert.deepEqual([...new Set(all.map((w) => w.masterFingerprint))], ['73c5da0a']);
-  assert.equal(new Set(all.map((w) => w.scripts.at(-1).addresses[0].address)).size, all.length);
-  assert.deepEqual(Object.keys(CHAINS), ['dgb', 'btc', 'ltc', 'doge']); // DigiByte leads
+  assert.equal(new Set(all.map((w) => (w.monero ? w.monero.address : w.scripts.at(-1).addresses[0].address))).size, all.length);
+  assert.deepEqual(Object.keys(CHAINS), ['dgb', 'btc', 'ltc', 'doge', 'xmr']); // DigiByte leads
 });
 
 test('addresses are only valid on their own chain, except the DGB/DOGE legacy overlap', () => {
@@ -179,4 +181,42 @@ test('addresses are only valid on their own chain, except the DGB/DOGE legacy ov
   assert.equal(checkAddress(DGB_VECTORS.p2pkh, NETWORKS.dogecoin).valid, true);
   assert.equal(checkAddress(CHAIN_VECTORS.dogecoin.p2pkh, NETWORKS.mainnet).valid, true);
   assert.match(deriveWallet(ABANDON, '', { network: NETWORKS.dogecoin }).scripts[0].note, /never send DGB here/);
+});
+
+test('Monero from the same seed (cross-checked against bip_utils and monero-python)', () => {
+  const xmr = deriveWallet(ABANDON, '', { network: NETWORKS.monero });
+  assert.equal(xmr.masterFingerprint, '73c5da0a');
+  assert.deepEqual(xmr.scripts, []);
+  assert.equal(xmr.monero.path, "m/44'/128'/0'/0/0");
+  assert.equal(xmr.monero.address, MONERO_VECTOR.address);
+  assert.equal(xmr.monero.privateViewKey, MONERO_VECTOR.privateViewKey);
+  assert.equal(moneroSeedWords(ABANDON), MONERO_VECTOR.words);
+
+  const pp = deriveWallet(LEGAL, 'cold ❄ storage', { network: NETWORKS.monero });
+  assert.equal(pp.monero.address, '479UaAkR625RLJQ5yCwR7AEvbm5gsfYrVJf94nn74UDA6F9UxCgD6R9S2kJXRKxaHDN5rFBVXooGoY1xekfTNQ8f6Cph3Jt');
+  assert.equal(pp.monero.privateViewKey, '98d13222df4750acc06224050c818abc0b3ca9d8c84ea69ad3cf386f78062501');
+  assert.match(moneroSeedWords(LEGAL, 'cold ❄ storage'), /^jockey sovereign enlist tail .* pledge adapt$/);
+
+  const acct1 = deriveWallet(ABANDON, '', { network: NETWORKS.monero, account: 1 });
+  assert.equal(acct1.monero.address, '43Fg836idZj8vopbDfcjx1Uf65B8Ai7i9TaQEzZm2xskJb3rJoboUSWAvGAfbYLkqi9NTRJXoApfYjmmEwowmHSyH7EKQo9');
+  assert.match(moneroSeedWords(ABANDON, '', { account: 1 }), /^keep depth salads .* stunning bounced$/);
+});
+
+test('Monero: nothing that can spend leaves deriveWallet or the kit', () => {
+  const xmr = deriveWallet(ABANDON, '', { network: NETWORKS.monero });
+  const kit = buildWatchKit(xmr);
+  const text = JSON.stringify([xmr, kit]);
+  // private spend key for this vector, and the first seed words
+  assert.doesNotMatch(text, /3b094ca7218f175e91fa2402b4ae239a2fe8262792a3e718533a1a357a1e4109|tavern|abandon/);
+  assert.equal(kit.containsPrivateKeys, false);
+  assert.equal(kit.containsPrivateViewKey, true);
+  assert.deepEqual(compareToKit(xmr, JSON.parse(JSON.stringify(kit))), []);
+  assert.ok(compareToKit(deriveWallet(ABANDON, 'x', { network: NETWORKS.monero }), kit).length > 0);
+});
+
+test('Monero address checker', () => {
+  assert.deepEqual(checkAddress(MONERO_VECTOR.address, NETWORKS.monero), { valid: true, type: 'primary' });
+  assert.equal(checkAddress(MONERO_VECTOR.address.replace('7eve', '7evf'), NETWORKS.monero).valid, false);
+  assert.equal(checkAddress(DGB_VECTORS.p2wpkh, NETWORKS.monero).valid, false);
+  assert.equal(checkAddress(MONERO_VECTOR.address, NETWORKS.mainnet).valid, false);
 });

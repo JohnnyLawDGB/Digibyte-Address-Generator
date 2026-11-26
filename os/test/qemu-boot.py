@@ -57,11 +57,11 @@ def page_through(start):
     """Step through the one-chain-per-screen pages; return everything shown."""
     seen = len(buf)
     for _ in range(8):
-        m = until(r"Press Enter (for \w+ \(\d of \d\)|to clear the screen and exit)", start=seen)
+        m = until(r"Press Enter (for \w+ \(\d of \d\)|to clear the screen and exit)|Monero seed to write down as well\? \[y/N\] ", start=seen)
         if "clear the screen" in m.group(0):
             return ANSI.sub("", buf[start:])
         seen = len(buf)
-        send("")
+        send("")  # next chain, or decline the optional Monero seed
     fail("too many chain pages")
 
 
@@ -108,12 +108,12 @@ shown = page_through(mark2)
 send("")
 step("ceremony completes (fingerprint %s)" % fp)
 chains = re.findall(r"Chain:\s+(\w+)", shown)
-if chains != ["DigiByte", "Bitcoin", "Litecoin", "Dogecoin"]:
-    fail("expected DigiByte, Bitcoin, Litecoin, Dogecoin in that order; saw %r" % chains)
-for prefix in (r"  0  bc1q", r"  0  ltc1q", r"  0  D[1-9A-HJ-NP-Za-km-z]{33}"):
+if chains != ["DigiByte", "Bitcoin", "Litecoin", "Dogecoin", "Monero"]:
+    fail("expected DigiByte, Bitcoin, Litecoin, Dogecoin, Monero in that order; saw %r" % chains)
+for prefix in (r"  0  bc1q", r"  0  ltc1q", r"  0  D[1-9A-HJ-NP-Za-km-z]{33}", r"Primary address\s+4[1-9A-HJ-NP-Za-km-z]{94}", r"Private view key\s+[0-9a-f]{64}"):
     if not re.search(prefix, shown):
         fail("missing address matching %r" % prefix)
-step("one seed shows DigiByte first, then Bitcoin, Litecoin and Dogecoin")
+step("one seed shows DigiByte first, then Bitcoin, Litecoin, Dogecoin and Monero")
 
 mark = len(buf)
 until(r"Choose 1-6: ", start=mark)

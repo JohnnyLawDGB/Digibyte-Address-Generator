@@ -18,7 +18,7 @@ while :; do
 	cat <<'BANNER'
 
   HoldFast Vault  ·  DigiByte cold storage
-  One seed also covers Bitcoin, Litecoin and Dogecoin.
+  One seed also covers Bitcoin, Litecoin, Dogecoin and Monero.
 
   This device has no network hardware enabled, runs entirely from memory,
   and forgets everything when powered off.
@@ -39,7 +39,7 @@ BANNER
 	2) node "$APP" $COMMON --require-dice --no-kit --require-passphrase || pause ;;
 	3) node "$APP" verify $COMMON || pause ;;
 	4)
-		printf 'Chain (dgb, btc, ltc, doge) [dgb]: '
+		printf 'Chain (dgb, btc, ltc, doge, xmr) [dgb]: '
 		read -r chain
 		printf 'Address: '
 		read -r addr

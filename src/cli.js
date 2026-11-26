@@ -18,13 +18,14 @@ import {
   mixEntropy,
   mnemonicFromEntropy,
   mnemonicProblem,
+  moneroSeedWords,
   normalizeDice,
   normalizeMnemonic,
   selfTest,
   wordsToBits,
 } from './core.js';
 
-const HELP = `dgb-coldprep ${VERSION} — air-gapped cold-storage prep for DigiByte (plus BTC, LTC, DOGE)
+const HELP = `dgb-coldprep ${VERSION} — air-gapped cold-storage prep for DigiByte (plus BTC, LTC, DOGE, XMR)
 
 Usage:
   dgb-coldprep [options]            Run the full cold-storage ceremony (default)
@@ -38,7 +39,7 @@ Ceremony options:
   --count N            Receive addresses to show per type (default 5)
   --account N          BIP44 account index (default 0)
   --chains LIST        Chains to derive from the one seed, comma separated:
-                       dgb (default), btc, ltc, doge, or "all"
+                       dgb (default), btc, ltc, doge, xmr, or "all"
   --testnet            Derive for DigiByte testnet
   --no-dice            Do not ask for dice rolls (system RNG only)
   --dice-only          Derive entropy only from dice (auditable by hand)
@@ -251,7 +252,7 @@ function preflight(opts) {
   out();
 
   const n = runSelfTest();
-  out(`${green('✔')} Self-test passed (${n} known-answer checks: BIP39, BIP32, BIP44/49/84/86, BIP380, DGB, BTC, LTC, DOGE)`);
+  out(`${green('✔')} Self-test passed (${n} known-answer checks: BIP39, BIP32, BIP44/49/84/86, BIP380, DGB, BTC, LTC, DOGE, XMR)`);
 
   if (!(process.stdin.isTTY && process.stdout.isTTY)) {
     if (!opts.unsafeNoTty) {
@@ -297,6 +298,15 @@ function printWallet(wallet, { showDescriptors }) {
   out(`${bold('Chain:')}              ${bold(NETWORKS[wallet.network].label)} (${NETWORKS[wallet.network].ticker})`);
   out(`${bold('Master fingerprint:')} ${wallet.masterFingerprint}   ${dim('(write this on your backup; it identifies the seed without revealing it)')}`);
   out(`${bold('BIP39 passphrase:')}   ${wallet.passphraseUsed ? yellow('YES — required for recovery, back it up separately') : 'none'}`);
+  if (wallet.monero) {
+    out();
+    out(`${bold('Monero wallet')} ${dim(`· ${wallet.monero.path} · same derivation as Ledger`)}`);
+    out(`  ${bold('Primary address')}   ${wallet.monero.address}`);
+    out(`  ${bold('Private view key')}  ${wallet.monero.privateViewKey}`);
+    out(dim('  The view key cannot spend, but it reveals every incoming payment. Give it only to your own'));
+    out(dim('  watch-only wallet. Create that wallet "from keys" with the address and view key above, and set'));
+    out(dim('  the restore height to the current block so it does not scan years of history.'));
+  }
   for (const s of wallet.scripts) {
     out();
     out(`${bold(s.label)} ${dim(`· ${s.bip} · ${s.accountPath}/0/i`)}`);
@@ -331,10 +341,38 @@ function writeKit(wallet, dir) {
   return file;
 }
 
+/**
+ * Monero wallets cannot restore from BIP39 words (only a Ledger can). Offer
+ * the native 25-word seed so the Monero is recoverable without this tool.
+ */
+async function offerMoneroSeed(term, wallet, { mnemonic, passphrase }) {
+  out('Your written seed restores this Monero wallet here or on a Ledger. Ordinary Monero wallets need');
+  out('their own 25-word seed instead. It is a second secret: anyone holding it can spend the Monero.');
+  if (!(await term.confirm('Show the 25-word Monero seed to write down as well?', false))) {
+    out();
+    return;
+  }
+  const words = moneroSeedWords(mnemonic, passphrase, { account: wallet.account }).split(' ');
+  term.clear();
+  out(bold('Monero 25-word seed') + dim('  (spends Monero only; write it by hand and label it "Monero")'));
+  out();
+  for (let r = 0; r < 5; r++) {
+    let line = '  ';
+    for (let c = 0; c < 5; c++) line += `${String(r + c * 5 + 1).padStart(2)}. ${bold(words[r + c * 5].padEnd(11))}`;
+    out(line);
+  }
+  out();
+  await term.ask('Press Enter when you have written and double-checked all 25 words… ');
+  term.clear();
+  out(`${green('✔')} Monero seed shown once and cleared.`);
+  out();
+}
+
 /** One chain per screen when there are several, so nothing scrolls away. */
 async function printWallets(term, wallets, opts) {
   for (let i = 0; i < wallets.length; i++) {
     printWallet(wallets[i], opts);
+    if (wallets[i].monero && opts.secrets) await offerMoneroSeed(term, wallets[i], opts.secrets);
     if (i < wallets.length - 1) {
       await term.ask(`Press Enter for ${NETWORKS[wallets[i + 1].network].label} (${i + 2} of ${wallets.length})… `);
       term.clear();
@@ -505,7 +543,7 @@ async function ceremony(opts) {
       if (await term.confirm(`Write the watch-only kit to ${process.cwd()}?`, true)) dir = process.cwd();
       out();
     }
-    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors || !dir });
+    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors || !dir, secrets: { mnemonic, passphrase } });
     if (dir) {
       for (const w of wallets) {
         const file = writeKit(w, dir);
@@ -552,7 +590,7 @@ async function verifyCommand(opts) {
     // A kit names its own chain; restore that one unless chains were chosen.
     if (kit && !opts.chains && !opts.testnet && NETWORKS[kit.network]) opts.networks = [NETWORKS[kit.network]];
     const wallets = deriveAll(mnemonic, passphrase, opts);
-    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors });
+    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors, secrets: { mnemonic, passphrase } });
 
     let ok = true;
     if (opts.kit) {

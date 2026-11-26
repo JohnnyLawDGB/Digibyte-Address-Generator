@@ -4,8 +4,9 @@ One-step, air-gapped cold-storage preparation for DigiByte: create a seed,
 prove the backup, and walk away with receive addresses and a watch-only kit
 for your online wallet. Private keys never touch a disk or a network.
 
-DigiByte is the default. The same seed can also produce Bitcoin, Litecoin and
-Dogecoin addresses (`--chains all`), so one written backup covers all four.
+DigiByte is the default. The same seed can also produce Bitcoin, Litecoin,
+Dogecoin and Monero wallets (`--chains all`), so one written backup covers
+all five.
 
 This is version 2 of the original `generator.js` script, rebuilt around
 current standards and a much smaller, audited dependency set.
@@ -18,6 +19,7 @@ current standards and a much smaller, audited dependency set.
 | **Entropy** | System CSPRNG, optionally hashed together with your own dice rolls, or dice only (seed = SHA-256 of the rolls, checkable by hand) |
 | **Addresses** | Native SegWit `dgb1q…` (BIP84, recommended), Taproot `dgb1p…` (BIP86), Wrapped SegWit `S…` (BIP49), Legacy `D…` (BIP44), coin type 20 |
 | **Other chains** | Bitcoin and Litecoin (the same four address types), Dogecoin (Legacy only; it has no SegWit or Taproot). Each uses its own coin type, so keys never overlap between chains |
+| **Monero** | Keys derived from the same seed at `m/44'/128'/0'/0/0`, the way Ledger's Monero app does it. Shows the primary address and private view key, and can show the standard 25-word Monero seed for restoring in any Monero wallet |
 | **Watch-only kit** | Master fingerprint, account xpubs and BIP380 output descriptors with checksums, ready for DigiByte Core `importdescriptors` |
 | **Recovery drill** | Re-enter the words and confirm they reproduce every key in the kit, before any coins are sent |
 
@@ -104,7 +106,7 @@ dgb-coldprep check-address ADDR   validate an address checksum
 dgb-coldprep selftest             run the known-answer tests
 ```
 
-Options: `--chains dgb,btc,ltc,doge|all`, `--words 12|24`, `--count N`,
+Options: `--chains dgb,btc,ltc,doge,xmr|all`, `--words 12|24`, `--count N`,
 `--account N`, `--testnet`, `--require-passphrase`,
 `--no-dice`, `--dice-only`, `--require-dice`, `--no-passphrase`, `--quick-verify`, `--out DIR`,
 `--no-kit`, `--show-descriptors`. Run `--help` for details.
@@ -128,6 +130,13 @@ only. Never fund a seed made with them.
   Label them carefully. A coin sent to the other chain's address is
   recoverable only by someone who knows how to derive that key on the wrong
   chain.
+- **Monero is different.** Ordinary Monero wallets cannot restore from the
+  24 words; only this tool or a Ledger can. Write down the optional 25-word
+  Monero seed if you want to restore elsewhere, and treat it as a second
+  secret. The Monero kit contains the private view key, which cannot spend
+  but reveals every incoming payment. Only the primary address is produced,
+  not subaddresses. Compatibility has been checked against two independent
+  libraries, not yet against the official Monero wallet or a Ledger device.
 - The watch-only kit import commands are written for DigiByte Core. Bitcoin
   Core and Litecoin Core accept the same descriptors; Dogecoin Core has no
   descriptor wallets, so use the listed addresses or the account `dgub`.
@@ -149,7 +158,9 @@ npm run build       # regenerate dist/ and SHA256SUMS
 ```
 
 Network parameters come from DigiByte Core `src/kernel/chainparams.cpp`.
-DigiByte test vectors were cross-checked against `bitcoinjs-lib` 6.
+DigiByte, Bitcoin, Litecoin and Dogecoin test vectors were cross-checked
+against `bitcoinjs-lib` 6; Monero vectors against `bip_utils` and
+`monero-python`. The Monero word list is from the Monero source (BSD-3).
 
 ## HoldFast Vault OS
 

@@ -12,10 +12,12 @@ seed as fellow proof-of-work chains.
 - [x] Bitcoin: same four address types
 - [x] Litecoin: same four address types
 - [x] Dogecoin: Legacy only (the chain has no SegWit or Taproot)
-- [ ] Monero: keys derived from the same seed the way Ledger does it
-      (`m/44'/128'/0'/0/0`), showing the primary address, the private view
-      key for a watch-only wallet, and optionally the 25-word Monero seed so
-      it also restores in any Monero wallet. Needs its own tested code path.
+- [x] Monero: keys derived from the same seed the way Ledger does it
+      (`m/44'/128'/0'/0/0`). Shows the primary address and the private view
+      key for a watch-only wallet, and offers the 25-word Monero seed so it
+      also restores in any Monero wallet.
+- [ ] Restore a generated Monero wallet in the official Monero wallet and on
+      a Ledger, to confirm compatibility on real software.
 
 **HoldFast Vault OS** (see [os/README.md](os/README.md))
 
@@ -26,6 +28,8 @@ seed as fellow proof-of-work chains.
 - [ ] On-screen warning before seed words are shown: use a plain monitor, not
       a network-connected smart TV, and a wired keyboard.
 - [ ] Watch-only kit export from the device: USB stick, and QR codes on screen.
+- [x] Pi 4 image builds from pinned sources; kernel checked to have no
+      network stack or drivers and the console drivers built in.
 - [ ] Verified reproducible image builds and signed releases.
 - [ ] Cross-restore test between a Vault seed and HoldFast Wallet.
 

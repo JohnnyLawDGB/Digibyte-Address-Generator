@@ -15,6 +15,13 @@ import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { ripemd160 } from '@noble/hashes/legacy.js';
 import { bytesToHex, concatBytes, utf8ToBytes } from '@noble/hashes/utils.js';
+import {
+  checkMoneroAddress,
+  moneroFromSpendKey,
+  moneroSpendKey,
+  moneroSpendKeyFromWords,
+  moneroWordsFromSpendKey,
+} from './monero.js';
 
 export const VERSION = '2.0.0';
 export { wordlist };
@@ -91,6 +98,17 @@ export const NETWORKS = Object.freeze({
       p2pkh: 'The only address type Dogecoin supports. Dogecoin and DigiByte legacy addresses both start with "D" and look alike: never send DGB here.',
     }),
   }),
+  // Monero. Not a Bitcoin-style chain: one primary address plus a private view
+  // key, derived from the same seed the way Ledger's Monero app does it.
+  monero: chain({
+    name: 'monero',
+    ticker: 'XMR',
+    label: 'Monero',
+    kind: 'monero',
+    coinType: 128,
+    bech32: null,
+    scriptTypes: Object.freeze([]),
+  }),
 });
 
 /** Short names accepted on the command line, DigiByte first. */
@@ -99,6 +117,7 @@ export const CHAINS = Object.freeze({
   btc: NETWORKS.bitcoin,
   ltc: NETWORKS.litecoin,
   doge: NETWORKS.dogecoin,
+  xmr: NETWORKS.monero,
 });
 
 // Ordered newest-first: the first entry is the recommended default.
@@ -261,6 +280,7 @@ export function encodeAddress(typeId, pubkey33, network) {
  * Returns { valid, type?, reason? }.
  */
 export function checkAddress(address, network = NETWORKS.mainnet) {
+  if (network.kind === 'monero') return checkMoneroAddress(address);
   const addr = String(address).trim();
   const lower = addr.toLowerCase();
   if (network.bech32 && lower.startsWith(network.bech32 + '1')) {
@@ -356,6 +376,14 @@ export function deriveWallet(mnemonic, passphrase = '', opts = {}) {
   seed.fill(0);
   const masterFingerprint = fingerprintHex(root.fingerprint);
 
+  if (network.kind === 'monero') {
+    const spend = moneroSpendKey(root, account);
+    const monero = { path: `m/44'/128'/${account}'/0/0`, ...moneroFromSpendKey(spend) };
+    spend.fill(0);
+    root.wipePrivateData();
+    return { network: network.name, masterFingerprint, account, passphraseUsed: String(passphrase).length > 0, scripts: [], monero };
+  }
+
   const scripts = SCRIPT_TYPES.filter((type) => network.scriptTypes.includes(type.id)).map((type) => {
     const origin = `${type.purpose}h/${network.coinType}h/${account}h`;
     const accountPath = `m/${type.purpose}'/${network.coinType}'/${account}'`;
@@ -398,6 +426,30 @@ export function deriveWallet(mnemonic, passphrase = '', opts = {}) {
   };
 }
 
+/**
+ * SECRET. The standard 25-word Monero seed for the same wallet, so it can be
+ * restored in any Monero wallet without this tool. Whoever has these words
+ * can spend the Monero (but nothing on the other chains).
+ */
+export function moneroSeedWords(mnemonic, passphrase = '', { account = 0 } = {}) {
+  const phrase = normalizeMnemonic(mnemonic);
+  const problem = mnemonicProblem(phrase);
+  if (problem) throw new Error(problem);
+  const seed = mnemonicToSeedSync(phrase, String(passphrase).normalize('NFKD'));
+  const root = HDKey.fromMasterSeed(seed);
+  seed.fill(0);
+  const spend = moneroSpendKey(root, account);
+  root.wipePrivateData();
+  const words = moneroWordsFromSpendKey(spend);
+  // Round-trip before anyone writes them down.
+  const back = moneroSpendKeyFromWords(words);
+  const ok = bytesToHex(back) === bytesToHex(spend);
+  spend.fill(0);
+  back.fill(0);
+  if (!ok) throw new Error('Internal error: Monero seed words did not round-trip');
+  return words;
+}
+
 /** The public kit written to disk / carried to the online machine. */
 export function buildWatchKit(wallet, { range = 999 } = {}) {
   const importdescriptors = [];
@@ -416,6 +468,8 @@ export function buildWatchKit(wallet, { range = 999 } = {}) {
     passphraseUsed: wallet.passphraseUsed,
     scripts: wallet.scripts.map(({ note, ...rest }) => rest),
     importdescriptors,
+    // A Monero view key cannot spend, but it reveals every incoming payment.
+    ...(wallet.monero ? { containsPrivateViewKey: true, monero: wallet.monero } : {}),
   };
 }
 
@@ -429,6 +483,10 @@ export function compareToKit(wallet, kit) {
   if (kit.network !== wallet.network) diffs.push(`network: kit=${kit.network} derived=${wallet.network}`);
   if (kit.masterFingerprint !== wallet.masterFingerprint) {
     diffs.push(`master fingerprint: kit=${kit.masterFingerprint} derived=${wallet.masterFingerprint}`);
+  }
+  if (wallet.monero) {
+    if (kit.monero?.address !== wallet.monero.address) diffs.push('monero: primary address differs');
+    if (kit.monero?.privateViewKey !== wallet.monero.privateViewKey) diffs.push('monero: private view key differs');
   }
   for (const s of wallet.scripts) {
     const k = (kit.scripts || []).find((x) => x.type === s.type);
@@ -513,6 +571,13 @@ export function selfTest() {
       check(`${NETWORKS[net].label} ${type} address decodes`, String(checkAddress(want, NETWORKS[net]).valid), 'true');
     }
   }
+  // Monero vectors (cross-checked against bip_utils and monero-python)
+  const xmr = deriveWallet(ABANDON, '', { network: NETWORKS.monero });
+  check('Monero primary address', xmr.monero.address, MONERO_VECTOR.address);
+  check('Monero private view key', xmr.monero.privateViewKey, MONERO_VECTOR.privateViewKey);
+  check('Monero 25-word seed', moneroSeedWords(ABANDON), MONERO_VECTOR.words);
+  check('Monero address decodes', String(checkAddress(MONERO_VECTOR.address, NETWORKS.monero).valid), 'true');
+  check('Monero address checker rejects a typo', String(checkAddress(MONERO_VECTOR.address.replace(/.$/, 'o'), NETWORKS.monero).valid), 'false');
   check('Address checker rejects a typo', String(checkAddress(dgbAddr('p2wpkh').replace(/.$/, (c) => (c === 'q' ? 'p' : 'q'))).valid), 'false');
 
   return { ok: results.every((r) => r.ok), results };
@@ -533,4 +598,11 @@ export const CHAIN_VECTORS = Object.freeze({
     p2tr: 'ltc1puht8rk95c53q3u9w3pf9h3jfcutcrl9lxc7rqsdthjrse4k6sn7q9tuqm9',
   }),
   dogecoin: Object.freeze({ p2pkh: 'DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC' }),
+});
+
+export const MONERO_VECTOR = Object.freeze({
+  address: '49vDbkSo7eve3J41sBdjvjaBUyz8qHohsQcGtRf63qEUTMBvmA45fpp5pSacMdSg7A3b71RejLzB8EkGbfjp5PELVF2N4Zn',
+  privateViewKey: '0f3fe25d0c6d4c94dde0c0bcc214b233e9c72927f813728b0f01f28f9d5e1201',
+  words:
+    'tavern judge beyond bifocals deepest mural onward dummy eagle diode gained vacation rally cause firm idled jerseys moat vigilant upload bobsled jobs cunning doing jobs',
 });

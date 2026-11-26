@@ -149,6 +149,18 @@ function renderResult(wallet, { title, kit, match }) {
     box.append(h, el('p', s.note, 'muted small'), list, det);
     return box;
   });
+  if (wallet.monero) {
+    const box = el('div', null, 'script');
+    const h = el('h3', 'Monero wallet ');
+    h.append(el('span', `· ${wallet.monero.path} · same derivation as Ledger`, 'muted'));
+    const pre = el('pre', `Primary address   ${wallet.monero.address}\nPrivate view key  ${wallet.monero.privateViewKey}`);
+    box.append(
+      h,
+      el('p', 'The view key cannot spend, but it reveals every incoming payment. Give it only to your own watch-only wallet. For a 25-word seed that restores in any Monero wallet, use the command-line tool.', 'muted small'),
+      pre
+    );
+    blocks.unshift(box);
+  }
   $('scripts').replaceChildren(...blocks);
   show('kitBox', Boolean(kit));
   $('kit').value = kit ? JSON.stringify(buildWatchKit(wallet), null, 2) : '';
@@ -192,7 +204,7 @@ function verify() {
       }
     }
     const count = kit?.scripts?.[0]?.addresses?.length || 5;
-    const wallet = deriveWallet(phrase, $('vPass').value, { network: NETWORKS[$('vNetwork').value], count });
+    const wallet = deriveWallet(phrase, $('vPass').value, { network: NETWORKS[kit?.network] || NETWORKS[$('vNetwork').value], count });
     $('vMnemonic').value = '';
     $('vPass').value = '';
     let match = null;
