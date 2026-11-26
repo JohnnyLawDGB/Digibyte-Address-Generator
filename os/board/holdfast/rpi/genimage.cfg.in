@@ -10,7 +10,7 @@ image boot.vfat {
 	size = 256M
 }
 
-image holdfast-vault-rpi4.img {
+image holdfast-vault-rpi.img {
 	hdimage {
 	}
 

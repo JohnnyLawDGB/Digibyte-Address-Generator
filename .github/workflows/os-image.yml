@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [qemu, rpi4]
+        target: [qemu, rpi]
     steps:
       - uses: actions/checkout@v4
       - name: Install build prerequisites
@@ -37,19 +37,19 @@ jobs:
         if: matrix.target == 'qemu'
         run: python3 os/test/qemu-boot.py os/output/qemu/images/Image
       - name: Package Raspberry Pi image
-        if: matrix.target == 'rpi4'
+        if: matrix.target == 'rpi'
         run: |
-          cd os/output/rpi4/images
-          cat holdfast-vault-rpi4.img.sha256
-          xz -T0 -6 holdfast-vault-rpi4.img
-          sha256sum holdfast-vault-rpi4.img.xz | tee holdfast-vault-rpi4.img.xz.sha256
+          cd os/output/rpi/images
+          cat holdfast-vault-rpi.img.sha256
+          xz -T0 -6 holdfast-vault-rpi.img
+          sha256sum holdfast-vault-rpi.img.xz | tee holdfast-vault-rpi.img.xz.sha256
       - name: Upload Raspberry Pi image
-        if: matrix.target == 'rpi4'
+        if: matrix.target == 'rpi'
         uses: actions/upload-artifact@v4
         with:
-          name: holdfast-vault-rpi4
+          name: holdfast-vault-rpi
           path: |
-            os/output/rpi4/images/holdfast-vault-rpi4.img.xz
-            os/output/rpi4/images/holdfast-vault-rpi4.img.xz.sha256
-            os/output/rpi4/images/holdfast-vault-rpi4.img.sha256
+            os/output/rpi/images/holdfast-vault-rpi.img.xz
+            os/output/rpi/images/holdfast-vault-rpi.img.xz.sha256
+            os/output/rpi/images/holdfast-vault-rpi.img.sha256
           if-no-files-found: error

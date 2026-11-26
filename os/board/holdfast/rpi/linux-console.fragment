@@ -1,4 +1,4 @@
-# Everything the Pi 4 needs for an HDMI console, a USB keyboard and a USB
+# Everything a Pi 3 or Pi 4 needs for an HDMI console, a USB keyboard and a USB
 # stick must be built in, because the image ships no loadable modules.
 CONFIG_FB=y
 CONFIG_FB_BCM2708=y
@@ -12,6 +12,11 @@ CONFIG_RESET_RASPBERRYPI=y
 CONFIG_USB=y
 CONFIG_USB_XHCI_HCD=y
 CONFIG_USB_XHCI_PCI=y
+CONFIG_USB_DWCOTG=y
+CONFIG_MMC_BCM2835_MMC=y
+CONFIG_MMC_BCM2835=y
+CONFIG_MMC_SDHCI_IPROC=y
+CONFIG_HW_RANDOM_BCM2835=y
 CONFIG_USB_HID=y
 CONFIG_HID_GENERIC=y
 CONFIG_INPUT_KEYBOARD=y

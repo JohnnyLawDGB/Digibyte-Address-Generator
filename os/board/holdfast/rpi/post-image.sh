@@ -26,4 +26,4 @@ genimage \
 	--outputpath "${BINARIES_DIR}" \
 	--config "${GENIMAGE_CFG}"
 
-(cd "${BINARIES_DIR}" && sha256sum holdfast-vault-rpi4.img > holdfast-vault-rpi4.img.sha256)
+(cd "${BINARIES_DIR}" && sha256sum holdfast-vault-rpi.img > holdfast-vault-rpi.img.sha256)

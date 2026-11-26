@@ -1,6 +1,5 @@
-# HoldFast Vault boot configuration for Raspberry Pi 4 / Pi 400.
-start_file=start4.elf
-fixup_file=fixup4.dat
+# HoldFast Vault boot configuration for Raspberry Pi 3 B, 3 B+, 4 B and Pi 400.
+# The boot ROM loads start.elf on a Pi 3 and start4.elf on a Pi 4 by itself.
 kernel=Image
 arm_64bit=1
 disable_overscan=1

@@ -1,6 +1,7 @@
-# HoldFast Vault for Raspberry Pi 4 / Pi 400 (64-bit)
+# HoldFast Vault for Raspberry Pi 3 B, 3 B+, 4 B and Pi 400 (64-bit).
+# One image: the boot partition carries both firmware sets and all four
+# device trees, and the Pi's own boot ROM picks the right ones.
 BR2_aarch64=y
-BR2_cortex_a72=y
 BR2_ARM_FPU_VFPV4=y
 BR2_GLOBAL_PATCH_DIR="board/raspberrypi/patches"
 BR2_TOOLCHAIN_EXTERNAL=y
@@ -22,18 +23,20 @@ BR2_TARGET_ROOTFS_INITRAMFS=y
 BR2_PACKAGE_HOLDFAST_NODE=y
 BR2_PACKAGE_HOLDFAST_VAULT=y
 BR2_ROOTFS_POST_SCRIPT_ARGS="tty1"
-BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi4/post-image.sh"
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi/post-image.sh"
 BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="$(call github,raspberrypi,linux,21b410140c47ffab5668399f6f143c7d7b935c8b)/linux-21b410140c47ffab5668399f6f143c7d7b935c8b.tar.gz"
 BR2_LINUX_KERNEL_DEFCONFIG="bcm2711"
-BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/linux-no-network.fragment $(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi4/linux-console.fragment"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/linux-no-network.fragment $(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi/linux-console.fragment"
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
-BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2711-rpi-4-b broadcom/bcm2711-rpi-400"
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="broadcom/bcm2710-rpi-3-b broadcom/bcm2710-rpi-3-b-plus broadcom/bcm2711-rpi-4-b broadcom/bcm2711-rpi-400"
 BR2_PACKAGE_RPI_FIRMWARE=y
+BR2_PACKAGE_RPI_FIRMWARE_BOOTCODE_BIN=y
+BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI=y
 BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4=y
 BR2_PACKAGE_RPI_FIRMWARE_INSTALL_DTB_OVERLAYS=y
-BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi4/config.txt"
-BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi4/cmdline.txt"
+BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi/config.txt"
+BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE="$(BR2_EXTERNAL_HOLDFAST_PATH)/board/holdfast/rpi/cmdline.txt"
 BR2_PACKAGE_HOST_DOSFSTOOLS=y
 BR2_PACKAGE_HOST_GENIMAGE=y
 BR2_PACKAGE_HOST_MTOOLS=y

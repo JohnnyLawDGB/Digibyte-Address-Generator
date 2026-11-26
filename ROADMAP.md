@@ -23,12 +23,12 @@ seed as fellow proof-of-work chains.
 
 - [x] Image boots to the ceremony in an emulator: no shell, no network,
       mandatory dice, 24 or 24+1, one chain per screen.
-- [ ] First boot on a real Raspberry Pi 4, working through the checklist in
-      `os/README.md`.
+- [ ] First boot on real hardware (a Raspberry Pi 3 B+ first), working
+      through the checklist in `os/README.md`.
 - [ ] On-screen warning before seed words are shown: use a plain monitor, not
       a network-connected smart TV, and a wired keyboard.
 - [ ] Watch-only kit export from the device: USB stick, and QR codes on screen.
-- [x] Pi 4 image builds from pinned sources; kernel checked to have no
+- [x] One image for Pi 3 B/B+, Pi 4 B and Pi 400 builds from pinned sources; kernel checked to have no
       network stack or drivers and the console drivers built in.
 - [ ] Verified reproducible image builds and signed releases.
 - [ ] Cross-restore test between a Vault seed and HoldFast Wallet.
