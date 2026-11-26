@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   CHAINS,
   CHAIN_VECTORS,
@@ -12,6 +13,7 @@ import {
   deriveWallet,
   descriptorChecksum,
   diceOnlyEntropy,
+  diceProblem,
   mixEntropy,
   mnemonicFromEntropy,
   mnemonicProblem,
@@ -142,6 +144,25 @@ test('dice handling', () => {
   const e = diceOnlyEntropy('123456'.repeat(17));
   assert.equal(e.length, 32);
   assert.equal(Buffer.from(e).toString('hex'), Buffer.from(diceOnlyEntropy(' 123456'.repeat(17))).toString('hex'));
+});
+
+test('typed-in dice patterns are caught; fair rolls pass', () => {
+  // The exact input from the first hardware test, which used to be accepted.
+  assert.match(diceProblem('654321'.repeat(17)), /repeat a pattern every 6 rolls/);
+  assert.match(diceProblem('6543216543215' + '654321'.repeat(15)), /every 6 rolls/); // with a typo
+  assert.match(diceProblem('1234561234'.repeat(10)), /every 10 rolls/);
+  assert.match(diceProblem('1'.repeat(100)), /fewer than 4 different faces/);
+  assert.match(diceProblem('12'.repeat(50)), /fewer than 4 different faces/);
+  assert.match(diceProblem('1'.repeat(60) + '23456'.repeat(8)), /one face makes up 60%/);
+  const random88 = '3423642432412553664651143551641115114246442365243344421532262114314444643231343556144453';
+  assert.match(diceProblem(random88 + '3'.repeat(12)), /comes up 10 or more times in a row/);
+  assert.equal(diceProblem('654321'.repeat(4)), null); // under 30 rolls is not judged
+  // Fair rolls (from a hash, so repeatable) pass at every length the CLI asks for.
+  for (const [n, tag] of [[30, 'a'], [50, 'b'], [100, 'c'], [150, 'd']]) {
+    let r = '';
+    for (let k = 0; r.length < n; k++) for (const b of createHash('sha256').update(`${tag}/${k}`).digest()) if (b < 252 && r.length < n) r += (b % 6) + 1;
+    assert.equal(diceProblem(r), null, r);
+  }
 });
 
 test('input bounds', () => {

@@ -176,6 +176,36 @@ export function normalizeDice(input) {
   return cleaned;
 }
 
+/**
+ * Obvious signs that dice rolls were typed rather than rolled: a short pattern
+ * repeated (654321654321…), one favourite face, too few faces, or a long run
+ * of one key. A person inventing "random" digits usually trips one. Fair rolls
+ * rarely do: in a million simulated fair sets, 38 of 30 rolls and under 10 of
+ * 50 to 150 rolls were flagged. Judges 30 or more rolls (fewer only add to
+ * the system RNG); returns a reason the user can act on, or null.
+ */
+export function diceProblem(dice) {
+  const r = normalizeDice(dice);
+  const n = r.length;
+  if (n < 30) return null;
+  const counts = [0, 0, 0, 0, 0, 0];
+  for (const c of r) counts[c - 1]++;
+  if (counts.filter(Boolean).length < 4) return 'they use fewer than 4 different faces';
+  const top = Math.max(...counts);
+  if (top * 2 > n) return `one face makes up ${Math.round((100 * top) / n)}% of them`;
+  for (let p = 1; p <= Math.min(12, Math.floor(n / 4)); p++) {
+    let same = 0;
+    for (let i = p; i < n; i++) if (r[i] === r[i - p]) same++;
+    if (same >= 0.6 * (n - p)) return p === 1 ? 'the same face keeps repeating' : `they repeat a pattern every ${p} rolls`;
+  }
+  let run = 1;
+  for (let i = 1; i < n; i++) {
+    run = r[i] === r[i - 1] ? run + 1 : 1;
+    if (run >= 10) return `one face comes up ${run} or more times in a row`;
+  }
+  return null;
+}
+
 /** Bits of entropy carried by n fair six-sided die rolls. */
 export const diceBits = (rolls) => Math.floor(rolls * Math.log2(6));
 

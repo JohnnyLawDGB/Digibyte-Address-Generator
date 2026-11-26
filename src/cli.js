@@ -15,6 +15,7 @@ import {
   deriveWallet,
   diceBits,
   diceOnlyEntropy,
+  diceProblem,
   mixEntropy,
   mnemonicFromEntropy,
   mnemonicProblem,
@@ -74,7 +75,11 @@ const red = paint('1;31');
 const yellow = paint('33');
 const green = paint('32');
 const dim = paint('2');
-const out = (s = '') => process.stdout.write(s + '\n');
+// The Linux text console (TERM=linux, as on the Vault's HDMI screen) uses a
+// 256-glyph font with no dashes, ellipses or check marks: they show as boxes.
+const ASCII_FOR = { '—': '-', '…': '...', '✔': 'OK', '✘': 'X', '→': '->' };
+export const plain = (s, term = process.env.TERM) => (term === 'linux' ? String(s).replace(/[—…✔✘→]/g, (c) => ASCII_FOR[c]) : s);
+const out = (s = '') => process.stdout.write(plain(s) + '\n');
 
 class UserAbort extends Error {}
 
@@ -181,6 +186,7 @@ class Terminal {
   }
 
   ask(prompt, { hidden = false } = {}) {
+    prompt = plain(prompt);
     return new Promise((resolve, reject) => {
       const finish = (fn) => (v) => {
         this.muted = false;
@@ -455,6 +461,7 @@ async function gatherEntropy(term, opts) {
   const bits = wordsToBits(opts.words);
   const fullRolls = Math.ceil(bits / Math.log2(6));
   if (opts.noDice) return { entropy: mixEntropy(nodeCrypto.randomBytes(64), null, bits), source: 'system RNG' };
+  const mustRoll = opts.requireDice || opts.diceOnly;
 
   out(bold('Step 1 — Entropy'));
   if (opts.diceOnly) {
@@ -463,34 +470,46 @@ async function gatherEntropy(term, opts) {
   } else {
     out('The seed comes from the system random number generator. To avoid trusting it alone,');
     out(`roll a die and type the results (digits 1-6; ${fullRolls} rolls = full ${bits}-bit strength).`);
-    out(`Your rolls are hashed together with the system RNG.${opts.requireDice ? '' : ' Press Enter to skip.'}`);
+    out('Your rolls are hashed together with the system RNG.');
   }
+  out('Type rolls as you go, one or many per line; they add up until you have enough.');
+  out(`Type u to take back the last line.${mustRoll ? '' : ' Press Enter on an empty line to finish early, or to skip dice.'}`);
+
+  // Each accepted line is kept separately so "u" can take back a typo.
+  let lines = [];
   for (;;) {
-    let dice;
+    const have = lines.join('').length;
+    const answer = await term.ask(`Dice rolls (${have} of ${fullRolls}): `);
+    if (answer.trim().toLowerCase() === 'u') {
+      if (lines.length) out(dim(`Took back the last ${lines.pop().length} roll(s).`));
+      continue;
+    }
+    let added;
     try {
-      dice = normalizeDice(await term.ask('Dice rolls: '));
+      added = normalizeDice(answer);
     } catch (e) {
-      out(red(e.message));
+      out(red(`${e.message}. That line was not added.`));
       continue;
     }
-    if (opts.diceOnly) {
-      try {
-        const entropy = diceOnlyEntropy(dice, bits);
-        if (new Set(dice).size < 4) {
-          out(red('Those rolls do not look random (fewer than 4 distinct faces). Roll a real die.'));
-          continue;
-        }
-        return { entropy, source: `${dice.length} dice rolls only` };
-      } catch (e) {
-        out(red(e.message));
-        continue;
-      }
+    if (added) {
+      lines.push(added);
+      if (have + added.length < fullRolls) continue;
     }
-    if (opts.requireDice && (dice.length < fullRolls || new Set(dice).size < 4)) {
-      out(red(`This device requires at least ${fullRolls} real dice rolls (got ${dice.length}${dice.length >= fullRolls ? ', and they do not look random' : ''}).`));
+
+    // Enough rolls, or an empty line.
+    const dice = lines.join('');
+    if (!dice && !mustRoll) return { entropy: mixEntropy(nodeCrypto.randomBytes(64), null, bits), source: 'system RNG' };
+    if (dice.length < fullRolls && mustRoll) {
+      out(red(`${opts.diceOnly ? 'Dice-only mode needs' : 'This device requires'} at least ${fullRolls} real dice rolls (got ${dice.length}).`));
       continue;
     }
-    if (!dice) return { entropy: mixEntropy(nodeCrypto.randomBytes(64), null, bits), source: 'system RNG' };
+    const problem = diceProblem(dice);
+    if (problem) {
+      out(red(`Those rolls do not look random: ${problem}. They were cleared. Roll a real die and start again.`));
+      lines = [];
+      continue;
+    }
+    if (opts.diceOnly) return { entropy: diceOnlyEntropy(dice, bits), source: `${dice.length} dice rolls only` };
     if (dice.length < fullRolls) {
       out(yellow(`${dice.length} rolls add ~${diceBits(dice.length)} bits; the system RNG supplies the rest.`));
     }
@@ -703,10 +722,10 @@ export async function main(argv = process.argv.slice(2)) {
   } catch (e) {
     if (e instanceof UserAbort) {
       if (process.stdout.isTTY) process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
-      process.stderr.write(`Aborted (${e.message}). Nothing was saved.\n`);
+      process.stderr.write(plain(`Aborted (${e.message}). Nothing was saved.\n`));
       return 130;
     }
-    process.stderr.write(`\n${red('ERROR:')} ${e.message}\n`);
+    process.stderr.write(plain(`\n${red('ERROR:')} ${e.message}\n`));
     return 1;
   }
 }

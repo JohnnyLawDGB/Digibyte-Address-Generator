@@ -16,7 +16,7 @@ current standards and a much smaller, audited dependency set.
 | | |
 |---|---|
 | **Seed** | BIP39, 24 words (256-bit) or 12 words, optional passphrase ("25th word") |
-| **Entropy** | System CSPRNG, optionally hashed together with your own dice rolls, or dice only (seed = SHA-256 of the rolls, checkable by hand) |
+| **Entropy** | System CSPRNG, optionally hashed together with your own dice rolls, or dice only (seed = SHA-256 of the rolls, checkable by hand). Rolls can be typed in batches; obvious typed-in patterns are refused |
 | **Addresses** | Native SegWit `dgb1q…` (BIP84, recommended), Taproot `dgb1p…` (BIP86), Wrapped SegWit `S…` (BIP49), Legacy `D…` (BIP44), coin type 20 |
 | **Other chains** | Bitcoin and Litecoin (the same four address types), Dogecoin (Legacy only; it has no SegWit or Taproot). Each uses its own coin type, so keys never overlap between chains |
 | **Monero** | Keys derived from the same seed at `m/44'/128'/0'/0/0`, the way Ledger's Monero app does it. Shows the primary address and private view key, and can show the standard 25-word Monero seed for restoring in any Monero wallet |

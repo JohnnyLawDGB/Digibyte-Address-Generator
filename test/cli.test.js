@@ -36,6 +36,15 @@ function drive(args, cwd, respond) {
   });
 }
 
+/** Fixed, random-looking die rolls (SHA-256 based), so tests are repeatable. */
+const fairRolls = (n, tag) => {
+  let s = '';
+  for (let k = 0; s.length < n; k++) {
+    for (const b of createHash('sha256').update(`${tag}/${k}`).digest()) if (b < 252 && s.length < n) s += (b % 6) + 1;
+  }
+  return s;
+};
+
 const wordsFrom = (stdout) => {
   const found = [...stdout.matchAll(/(\d+)\. ([a-z]+)/g)].map((m) => [Number(m[1]), m[2]]);
   return found.sort((a, b) => a[0] - b[0]).map((x) => x[1]);
@@ -90,8 +99,10 @@ test('refuses to make a seed when piped, and when a network interface is up', ()
 test('full ceremony → watch kit → recovery drill', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
   let words;
+  let rolled = 0;
   const made = await drive([...TEST_FLAGS, '--out', dir, '--count', '3'], dir, (line, all) => {
-    if (line.startsWith('Dice rolls:')) return '1234561234';
+    // A few rolls, then an empty line to finish early: the RNG supplies the rest.
+    if (line.startsWith('Dice rolls (')) return ['1234561234', ''][rolled++];
     if (line.startsWith('BIP39 passphrase')) return 'hunter2';
     if (line.startsWith('Repeat passphrase')) return 'hunter2';
     if (line.startsWith('Press Enter when you have written')) return ((words = wordsFrom(all)), '');
@@ -151,18 +162,54 @@ test('a failed backup check discards the seed and writes nothing', async () => {
 
 test('--require-dice insists on a full set of rolls', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
+  const rolls = fairRolls(50, 'cli-a');
+  const answers = ['', '12345x', '123456', 'u', rolls.slice(0, 30), '', rolls.slice(30)];
   let asked = 0;
   const res = await drive([...TEST_FLAGS, '--require-dice', '--no-passphrase', '--no-kit', '--words', '12'], dir, (line) => {
-    if (line.startsWith('Dice rolls:')) return ['', '123456', '1'.repeat(60), '1234561234'.repeat(5)][asked++];
+    if (line.startsWith('Dice rolls (')) return answers[asked++];
     if (line.startsWith('Press Enter when you have written')) return '';
     if (line.startsWith('Seed phrase:')) return 'x';
     return null;
   });
-  assert.equal(asked, 4);
-  assert.equal((res.stdout.match(/requires at least 50 real dice rolls/g) || []).length, 3);
+  assert.equal(asked, answers.length);
+  // Rolls add up across lines, a bad line is not added, and u takes back a line.
+  assert.match(res.stdout, /requires at least 50 real dice rolls \(got 0\)/);
+  assert.match(res.stdout, /only contain the digits 1-6\. That line was not added/);
+  assert.match(res.stdout, /Took back the last 6 roll/);
+  assert.match(res.stdout, /Dice rolls \(30 of 50\)/);
+  assert.match(res.stdout, /requires at least 50 real dice rolls \(got 30\)/);
   assert.match(res.stdout, /system RNG \+ 50 dice rolls/);
   assert.equal(run(['--require-dice', '--no-dice']).status, 2);
   fs.rmSync(dir, { recursive: true });
+});
+
+test('dice that follow a pattern are refused and cleared', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
+  const answers = ['654321'.repeat(9), fairRolls(50, 'cli-a')];
+  let asked = 0;
+  const res = await drive([...TEST_FLAGS, '--require-dice', '--no-passphrase', '--no-kit', '--words', '12'], dir, (line) => {
+    if (line.startsWith('Dice rolls (')) return answers[asked++];
+    if (line.startsWith('Press Enter when you have written')) return '';
+    if (line.startsWith('Seed phrase:')) return 'x';
+    return null;
+  });
+  assert.equal(asked, 2);
+  assert.match(res.stdout, /do not look random: they repeat a pattern every 6 rolls\. They were cleared/);
+  assert.match(res.stdout, /Dice rolls \(0 of 50\)[^]*system RNG \+ 50 dice rolls/);
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('the Linux text console gets plain characters instead of missing glyphs', () => {
+  const env = (TERM) => ({ ...process.env, TERM, NO_COLOR: '1' });
+  const linux = spawnSync(process.execPath, [BUNDLE, 'selftest'], { encoding: 'utf8', env: env('linux') });
+  assert.equal(linux.status, 0);
+  assert.match(linux.stdout, /^OK \d+ checks passed/m);
+  assert.doesNotMatch(linux.stdout + linux.stderr, /[—…✔✘→]/);
+  const help = spawnSync(process.execPath, [BUNDLE, '--help'], { encoding: 'utf8', env: env('linux') });
+  assert.match(help.stdout, /air-gapped cold-storage prep/);
+  assert.doesNotMatch(help.stdout, /[—…✔✘→]/);
+  const xterm = spawnSync(process.execPath, [BUNDLE, 'selftest'], { encoding: 'utf8', env: env('xterm-256color') });
+  assert.match(xterm.stdout, /✔ \d+ checks passed/);
 });
 
 test('--require-passphrase refuses an empty passphrase', async () => {

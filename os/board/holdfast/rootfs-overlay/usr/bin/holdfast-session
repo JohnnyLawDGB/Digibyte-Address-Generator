@@ -13,7 +13,7 @@ TYPED='You will type your seed words on this keyboard and see them on this scree
 trap '' INT QUIT TSTP HUP
 
 pause() {
-	printf '\nPress Enter to return to the menu… '
+	printf '\nPress Enter to return to the menu... '
 	read -r _
 }
 
@@ -32,6 +32,28 @@ mount_stick() { # $1 device, $2 ro|rw
 		mount -t "$fs" -o "$2,nodev,nosuid,noexec" "$1" "$USB_MNT" 2>/dev/null && return 0
 	done
 	return 1
+}
+
+# Say what is on a stick that would not open, so the user knows what to do
+# instead. Nothing on the stick is changed.
+describe_stick() { # $1 device
+	info=$(blkid 2>/dev/null | grep "^$1:")
+	type=$(echo "$info" | sed -n 's/.* TYPE="\([^"]*\)".*/\1/p')
+	label=$(echo "$info" | sed -n 's/.* LABEL="\([^"]*\)".*/\1/p')
+	case "$type" in
+	'') echo "  Could not open the stick: $1 has no filesystem this device recognises." ;;
+	iso9660 | udf)
+		echo "  Could not open the stick: it holds a disc image${label:+ (\"$label\")},"
+		echo '  like an installer or recovery stick. Writing to it could break it.'
+		;;
+	vfat | exfat)
+		echo "  Could not open the stick: it is $type but would not mount. Check it on"
+		echo '  another computer. The system reported:'
+		dmesg 2>/dev/null | grep -i "${1#/dev/}" | tail -n 2 | sed 's/^/    /'
+		;;
+	*) echo "  Could not open the stick: it is formatted $type${label:+ (\"$label\")}." ;;
+	esac
+	echo '  Use a stick formatted FAT32 or exFAT, or type skip. Nothing was written.'
 }
 
 # Copy the public watch-only kit files to a USB stick, then remount the stick
@@ -64,7 +86,7 @@ TEXT
 		sleep 2
 		dev=$(find_stick) || { echo '  No USB stick found. Try another port or stick.'; continue; }
 		if ! mount_stick "$dev" rw; then
-			echo '  Could not open the stick. It must be formatted FAT32 or exFAT.'
+			describe_stick "$dev"
 			continue
 		fi
 		dest="$USB_MNT/holdfast-vault"

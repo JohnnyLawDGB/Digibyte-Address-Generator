@@ -24,7 +24,10 @@ yet been confirmed on real hardware. Do not use it for real funds yet.
   console. There is no serial console, SSH, or getty.
 - **Dice are mandatory.** A freshly booted device has had little time to
   gather randomness, so the ceremony requires a full set of dice rolls, mixed
-  with the system generator.
+  with the system generator. Type them in any batch size: they add up, with a
+  running count, and `u` takes back the last line. Rolls that are obviously
+  typed rather than rolled (a repeating pattern, one favourite face) are
+  refused.
 - **DigiByte first, five chains.** One seed produces DigiByte, Bitcoin,
   Litecoin, Dogecoin and Monero wallets, shown one chain per screen with
   DigiByte leading.

@@ -24,7 +24,11 @@ seed as fellow proof-of-work chains.
 - [x] Image boots to the ceremony in an emulator: no shell, no network,
       mandatory dice, 24 or 24+1, one chain per screen.
 - [ ] First boot on real hardware (a Raspberry Pi 3 B+ first), working
-      through the checklist in `os/README.md`.
+      through the checklist in `os/README.md`. Started 2026-11-26 on a Pi 3 B+:
+      boots, keyboard, self-test, ceremony, QR display and an unchanged card
+      all passed. Fixed from that run: dice entry adds up across lines,
+      patterned dice are refused, plain characters on the HDMI console, and a
+      clear message for a stick that is not FAT32 or exFAT.
 - [x] On-screen warning before seed words are shown or typed: use a plain
       monitor, not a network-connected smart TV, and a wired keyboard.
 - [x] Watch-only kit export from the device: USB stick (written, then

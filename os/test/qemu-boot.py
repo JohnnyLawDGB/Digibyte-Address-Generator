@@ -98,6 +98,10 @@ def page_through(start, qr_for=None):
 
 
 WARNING = r"type b to go back to the menu: "
+DICE = r"Dice rolls \(\d+ of \d+\): "
+# Fixed rolls that look random enough for the device's pattern check.
+ROLLS_1 = "1226165456431333136552465256521652613246154614221455135346455253654324115456263462566263636143311343"
+ROLLS_2 = "4565133613655635335261326666446421341143612466213253152123323525634166464316124425635644323355321212"
 
 
 def past_warning(start):
@@ -141,12 +145,20 @@ send("1")
 past_warning(mark)
 until(r"No active network interfaces", start=mark)
 step("tool sees no network interface")
-until(r"Dice rolls: ", start=mark)
+until(DICE, start=mark)
 send("")
 until(r"requires at least 100 real dice rolls", start=mark)
 step("dice rolls are mandatory")
 mark2 = len(buf)
-send("1234561234" * 10)
+send("654321" * 17)  # typed, not rolled
+until(r"do not look random: they repeat a pattern every 6 rolls", start=mark2)
+step("dice that follow a pattern are refused")
+until(r"Dice rolls \(0 of 100\): ", start=mark2)
+send(ROLLS_1[:60])
+until(r"Dice rolls \(60 of 100\): ", start=mark2)
+send(ROLLS_1[60:])
+until(r"system RNG \+ 100 dice rolls", start=mark2)
+step("dice rolls add up across lines")
 until(r"Press Enter when you have written", start=mark2)
 text = ANSI.sub("", buf[mark2:])
 words = [w for _, w in sorted((int(n), w) for n, w in re.findall(r"(\d+)\. ([a-z]+)", text))]
@@ -215,8 +227,8 @@ until(r"Choose 1-6: ", start=mark)
 mark = len(buf)
 send("2")
 past_warning(mark)
-until(r"Dice rolls: ", start=mark)
-send("6543216543" * 10)
+until(DICE, start=mark)
+send(ROLLS_2)
 until(r"BIP39 passphrase: ", start=mark)
 send("")
 until(r"A passphrase is required in this mode", start=mark)

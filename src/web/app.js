@@ -8,6 +8,7 @@ import {
   deriveWallet,
   diceBits,
   diceOnlyEntropy,
+  diceProblem,
   mixEntropy,
   mnemonicFromEntropy,
   mnemonicProblem,
@@ -63,6 +64,8 @@ const allowed = () => safe || $('practice').checked;
 
 function gatherEntropy(bits) {
   const dice = normalizeDice($('dice').value);
+  const problem = diceProblem(dice);
+  if (problem) throw new Error(`Those rolls do not look random: ${problem}. Roll a real die.`);
   if ($('diceOnly').checked) {
     if (new Set(dice).size < 4 && dice.length) throw new Error('Those rolls do not look random. Roll a real die.');
     return { entropy: diceOnlyEntropy(dice, bits), source: `${dice.length} dice rolls only` };
