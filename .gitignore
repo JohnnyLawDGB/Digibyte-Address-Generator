@@ -1,2 +1,4 @@
 node_modules/
 dgb-watch-kit-*.json
+__pycache__/
+*.pyc
