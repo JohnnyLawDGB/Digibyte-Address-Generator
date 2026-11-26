@@ -27,7 +27,10 @@ seed as fellow proof-of-work chains.
       through the checklist in `os/README.md`.
 - [ ] On-screen warning before seed words are shown: use a plain monitor, not
       a network-connected smart TV, and a wired keyboard.
-- [ ] Watch-only kit export from the device: USB stick, and QR codes on screen.
+- [x] Watch-only kit export from the device: USB stick (written, then
+      re-read and compared), and QR codes on screen.
+- [ ] Scan a QR code off a real screen with a phone, and export to a real
+      USB stick.
 - [x] One image for Pi 3 B/B+, Pi 4 B and Pi 400 builds from pinned sources; kernel checked to have no
       network stack or drivers and the console drivers built in.
 - [ ] Verified reproducible image builds and signed releases.

@@ -220,3 +220,18 @@ test('Monero address checker', () => {
   assert.equal(checkAddress(DGB_VECTORS.p2wpkh, NETWORKS.monero).valid, false);
   assert.equal(checkAddress(MONERO_VECTOR.address, NETWORKS.mainnet).valid, false);
 });
+
+test('QR codes: square, with a quiet zone, and one text row per two modules', async () => {
+  const { qrLines, qrMatrix } = await import('../src/qr.js');
+  const m = qrMatrix(DGB_VECTORS.p2wpkh);
+  assert.equal(m.length, m[0].length);
+  assert.equal((m.length - 17) % 4, 0); // a valid QR version size
+  // finder pattern corner
+  assert.deepEqual(m[0].slice(0, 7), [true, true, true, true, true, true, true]);
+  const q = qrLines(DGB_VECTORS.p2wpkh, { color: false });
+  assert.equal(q.columns, m.length + 8);
+  assert.equal(q.rows, Math.ceil((m.length + 8) / 2));
+  assert.match(q.lines[0], /^ +$/); // quiet zone
+  const desc = deriveWallet(ABANDON).scripts[0].descriptors.receive;
+  assert.ok(qrLines(desc).columns <= 80, 'a descriptor fits an 80-column console');
+});

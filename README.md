@@ -43,7 +43,7 @@ current standards and a much smaller, audited dependency set.
   and it is read back and re-verified. Passphrase input is hidden, there is
   no line history, and the screen and scrollback are wiped at each stage.
 - **Audited crypto only:** `@noble/curves`, `@noble/hashes`, `@scure/bip32`,
-  `@scure/bip39`, `@scure/base`, pinned to exact versions with lockfile
+  `@scure/bip39`, `@scure/base`, plus `qr` from the same author for QR codes, pinned to exact versions with lockfile
   integrity hashes.
 - **Reproducible build.** CI rebuilds `dist/` from `src/` and fails on any
   byte difference.
@@ -109,7 +109,7 @@ dgb-coldprep selftest             run the known-answer tests
 Options: `--chains dgb,btc,ltc,doge,xmr|all`, `--words 12|24`, `--count N`,
 `--account N`, `--testnet`, `--require-passphrase`,
 `--no-dice`, `--dice-only`, `--require-dice`, `--no-passphrase`, `--quick-verify`, `--out DIR`,
-`--no-kit`, `--show-descriptors`. Run `--help` for details.
+`--no-kit`, `--show-descriptors`, `--qr`. Run `--help` for details.
 
 `--allow-online` and `--unsafe-no-tty` exist for practice and automated tests
 only. Never fund a seed made with them.

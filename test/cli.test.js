@@ -223,3 +223,26 @@ test('--chains all derives every chain from one seed, DigiByte first', async () 
   assert.equal(run(['--chains', 'xyz']).status, 2);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('--qr shows scannable codes for public data only', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
+  let words;
+  const res = await drive([...TEST_FLAGS, '--qr', '--chains', 'dgb,xmr', '--no-dice', '--no-passphrase', '--no-kit', '--words', '12', '--count', '1'], dir, (line, all) => {
+    if (line.startsWith('Press Enter when you have written and double-checked all words')) return ((words = wordsFrom(all)), '');
+    if (line.startsWith('Seed phrase:')) return words.join(' ');
+    if (line.startsWith('Show QR codes for')) return 'y';
+    if (line.startsWith('Show the 25-word Monero seed')) return 'n';
+    if (line.startsWith('Enter for the next code') || line.startsWith('Press Enter')) return '';
+    return null;
+  });
+  assert.equal(res.code, 0, res.stdout + res.stderr);
+  const titles = [...res.stdout.matchAll(/^(DigiByte mainnet|Monero) .*(address|descriptor|view key).*$/gm)].map((m) => m[0]);
+  assert.equal(titles.filter((t) => t.startsWith('DigiByte')).length, 8); // 4 types x (address + descriptor)
+  assert.equal(titles.filter((t) => t.startsWith('Monero')).length, 2);
+  assert.match(res.stdout, /█▀▀▀▀▀█/); // a finder pattern was drawn
+  // Seed words never appear after the backup is verified, QR screens included.
+  const after = res.stdout.split('Backup verified')[1];
+  assert.doesNotMatch(after, new RegExp(`\\b${words[3]} ${words[4]}\\b`));
+  assert.doesNotMatch(after, /xprv|Monero 25-word seed/);
+  fs.rmSync(dir, { recursive: true });
+});

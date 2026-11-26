@@ -24,6 +24,7 @@ import {
   selfTest,
   wordsToBits,
 } from './core.js';
+import { qrLines } from './qr.js';
 
 const HELP = `dgb-coldprep ${VERSION} — air-gapped cold-storage prep for DigiByte (plus BTC, LTC, DOGE, XMR)
 
@@ -51,6 +52,8 @@ Ceremony options:
   --out DIR            Write the public watch-only kit to DIR without asking
   --no-kit             Never write anything to disk
   --show-descriptors   Print xpubs and output descriptors on screen
+  --qr                 Offer QR codes of addresses and watch-only descriptors,
+                       to carry public data off the screen with a camera
 
 Verify options:
   --kit FILE           Compare against a saved watch-only kit
@@ -87,6 +90,7 @@ function parseArgs(argv) {
     '--quick-verify': 'quickVerify',
     '--no-kit': 'noKit',
     '--show-descriptors': 'showDescriptors',
+    '--qr': 'qr',
     '--allow-online': 'allowOnline',
     '--unsafe-no-tty': 'unsafeNoTty',
     '--help': 'help',
@@ -368,11 +372,55 @@ async function offerMoneroSeed(term, wallet, { mnemonic, passphrase }) {
   out();
 }
 
+/** Public items worth scanning for one chain: never anything that can spend. */
+export function qrItems(wallet) {
+  const label = NETWORKS[wallet.network].label;
+  if (wallet.monero) {
+    return [
+      { title: `${label} primary address`, text: wallet.monero.address },
+      { title: `${label} private view key (reveals incoming payments; cannot spend)`, text: wallet.monero.privateViewKey },
+    ];
+  }
+  const items = [];
+  for (const s of wallet.scripts) {
+    items.push({ title: `${label} ${s.label} receive address #0`, text: s.addresses[0].address });
+    items.push({ title: `${label} ${s.label} watch-only descriptor (receive)`, text: s.descriptors.receive });
+  }
+  return items;
+}
+
+async function offerQrCodes(term, wallet) {
+  const label = NETWORKS[wallet.network].label;
+  if (!(await term.confirm(`Show QR codes for ${label} (addresses and watch-only keys, nothing that can spend)?`, false))) {
+    out();
+    return;
+  }
+  const items = qrItems(wallet);
+  for (let i = 0; i < items.length; i++) {
+    const qr = qrLines(items[i].text, { color: useColor });
+    term.clear();
+    out(bold(items[i].title));
+    out();
+    const cols = process.stdout.columns || 0;
+    const rows = process.stdout.rows || 0;
+    if ((cols && qr.columns > cols) || (rows && qr.rows + 6 > rows)) {
+      out(yellow('This screen is too small to draw the code. The text is:'));
+    } else for (const line of qr.lines) out(line);
+    out();
+    out(items[i].text);
+    out();
+    const a = await term.ask(i < items.length - 1 ? `Enter for the next code (${i + 2} of ${items.length}), or q to stop… ` : 'Press Enter to continue… ');
+    if (a.trim().toLowerCase() === 'q') break;
+  }
+  term.clear();
+}
+
 /** One chain per screen when there are several, so nothing scrolls away. */
 async function printWallets(term, wallets, opts) {
   for (let i = 0; i < wallets.length; i++) {
     printWallet(wallets[i], opts);
     if (wallets[i].monero && opts.secrets) await offerMoneroSeed(term, wallets[i], opts.secrets);
+    if (opts.qr) await offerQrCodes(term, wallets[i]);
     if (i < wallets.length - 1) {
       await term.ask(`Press Enter for ${NETWORKS[wallets[i + 1].network].label} (${i + 2} of ${wallets.length})… `);
       term.clear();
@@ -543,7 +591,7 @@ async function ceremony(opts) {
       if (await term.confirm(`Write the watch-only kit to ${process.cwd()}?`, true)) dir = process.cwd();
       out();
     }
-    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors || !dir, secrets: { mnemonic, passphrase } });
+    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors || !dir, secrets: { mnemonic, passphrase }, qr: opts.qr });
     if (dir) {
       for (const w of wallets) {
         const file = writeKit(w, dir);
@@ -590,7 +638,7 @@ async function verifyCommand(opts) {
     // A kit names its own chain; restore that one unless chains were chosen.
     if (kit && !opts.chains && !opts.testnet && NETWORKS[kit.network]) opts.networks = [NETWORKS[kit.network]];
     const wallets = deriveAll(mnemonic, passphrase, opts);
-    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors, secrets: { mnemonic, passphrase } });
+    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors, secrets: { mnemonic, passphrase }, qr: opts.qr });
 
     let ok = true;
     if (opts.kit) {

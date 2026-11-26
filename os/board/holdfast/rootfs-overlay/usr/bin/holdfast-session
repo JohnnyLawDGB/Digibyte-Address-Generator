@@ -3,6 +3,8 @@
 # shell: this menu is started directly by init and restarted if it exits.
 
 APP=/opt/holdfast/dgb-coldprep.cjs
+KIT_DIR=/run/holdfast-kit   # in memory; gone at power-off
+USB_MNT=/run/holdfast-usb
 # Every chain from the one seed, DigiByte first, three addresses per type so
 # each chain fits on one screen.
 COMMON='--chains all --count 3'
@@ -11,6 +13,98 @@ trap '' INT QUIT TSTP HUP
 pause() {
 	printf '\nPress Enter to return to the menu… '
 	read -r _
+}
+
+# First partition of the first USB disk, or the bare disk if it has no
+# partition table. Nothing else on the system is a /dev/sd* device.
+find_stick() {
+	for dev in /dev/sd?1 /dev/sd?; do
+		[ -b "$dev" ] && { echo "$dev"; return 0; }
+	done
+	return 1
+}
+
+mount_stick() { # $1 device, $2 ro|rw
+	mkdir -p "$USB_MNT"
+	for fs in vfat exfat; do
+		mount -t "$fs" -o "$2,nodev,nosuid,noexec" "$1" "$USB_MNT" 2>/dev/null && return 0
+	done
+	return 1
+}
+
+# Copy the public watch-only kit files to a USB stick, then remount the stick
+# read-only and compare, so what left the device is known to be intact.
+export_kit() {
+	ls "$KIT_DIR"/*.json >/dev/null 2>&1 || return 0
+	clear
+	cat <<'TEXT'
+  Save the watch-only kit to a USB stick
+
+  The kit holds addresses and public keys for your online, watch-only wallet.
+  It cannot spend. It does reveal all of your addresses to whoever has it.
+
+  Use a stick you trust, formatted FAT32 or exFAT. Only these files are
+  written; nothing on the stick is opened or run.
+
+TEXT
+	include_xmr=n
+	if ls "$KIT_DIR"/*-monero.json >/dev/null 2>&1; then
+		echo '  The Monero kit contains the private view key, which reveals every'
+		echo '  incoming Monero payment (it still cannot spend).'
+		printf '  Include the Monero kit? [y/N] '
+		read -r include_xmr
+		echo
+	fi
+	while :; do
+		printf '  Insert the USB stick, wait a few seconds, then press Enter (or type skip): '
+		read -r answer
+		[ "$answer" = skip ] && { echo '  Skipped. Nothing was written.'; break; }
+		sleep 2
+		dev=$(find_stick) || { echo '  No USB stick found. Try another port or stick.'; continue; }
+		if ! mount_stick "$dev" rw; then
+			echo '  Could not open the stick. It must be formatted FAT32 or exFAT.'
+			continue
+		fi
+		dest="$USB_MNT/holdfast-vault"
+		ok=1
+		mkdir -p "$dest" || ok=0
+		for f in "$KIT_DIR"/*.json; do
+			case "$f" in *-monero.json) [ "$include_xmr" = y ] || [ "$include_xmr" = Y ] || continue ;; esac
+			cp "$f" "$dest/" || ok=0
+		done
+		sync
+		umount "$USB_MNT" || ok=0
+		if [ "$ok" = 1 ] && mount_stick "$dev" ro; then
+			count=0
+			for f in "$KIT_DIR"/*.json; do
+				case "$f" in *-monero.json) [ "$include_xmr" = y ] || [ "$include_xmr" = Y ] || continue ;; esac
+				cmp -s "$f" "$USB_MNT/holdfast-vault/$(basename "$f")" || ok=0
+				count=$((count + 1))
+			done
+			umount "$USB_MNT" || ok=0
+		else
+			ok=0
+		fi
+		if [ "$ok" = 1 ]; then
+			echo "  Saved and verified $count kit file(s) in the holdfast-vault folder."
+			echo '  You can remove the stick now.'
+			break
+		fi
+		echo '  Writing or verifying failed. Try again, or use another stick.'
+	done
+	rm -rf "$KIT_DIR"
+	pause
+}
+
+new_seed() { # $1: passphrase option
+	rm -rf "$KIT_DIR"
+	mkdir -p "$KIT_DIR"
+	if node "$APP" $COMMON --require-dice --qr --out "$KIT_DIR" "$1"; then
+		export_kit
+	else
+		rm -rf "$KIT_DIR"
+		pause
+	fi
 }
 
 while :; do
@@ -35,9 +129,9 @@ BANNER
 	read -r choice || exit 0
 	clear
 	case "$choice" in
-	1) node "$APP" $COMMON --require-dice --no-kit --no-passphrase || pause ;;
-	2) node "$APP" $COMMON --require-dice --no-kit --require-passphrase || pause ;;
-	3) node "$APP" verify $COMMON || pause ;;
+	1) new_seed --no-passphrase ;;
+	2) new_seed --require-passphrase ;;
+	3) node "$APP" verify $COMMON --qr || pause ;;
 	4)
 		printf 'Chain (dgb, btc, ltc, doge, xmr) [dgb]: '
 		read -r chain

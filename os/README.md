@@ -31,6 +31,23 @@ yet been confirmed on real hardware. Do not use it for real funds yet.
 - **24 words, or 24 + 1.** The menu offers a 24-word seed on its own, or a
   24-word seed with a passphrase (the "25th word"), which is then required.
 
+## Getting the watch-only kit off the device
+
+After a new seed is verified, the Vault offers two ways to carry **public**
+data to your online machine. Neither can move anything that spends.
+
+- **USB stick.** Insert a FAT32 or exFAT stick when asked. The kit files are
+  copied to a `holdfast-vault` folder, the stick is remounted read-only and
+  compared, and you are told when it is safe to remove. Nothing on the stick
+  is opened or run, and it is mounted with execution disabled. The Monero kit
+  is copied only if you say yes, because it holds the private view key.
+- **QR codes.** Each chain's screen offers QR codes for the first receive
+  address and the watch-only descriptor of every address type, so nothing has
+  to be plugged in at all.
+
+A USB stick is still a device you are plugging into an air-gapped machine.
+Use a new one or one you trust, and prefer QR codes if in doubt.
+
 ## What you need
 
 - **A Raspberry Pi 3 Model B or B+, a Pi 4 Model B (any memory size), or a
@@ -44,6 +61,7 @@ yet been confirmed on real hardware. Do not use it for real funds yet.
   wired USB keyboard, and the Pi's power supply (micro-USB on a Pi 3, USB-C
   on a Pi 4). Avoid wireless keyboards: their dongle is a radio.
 - A six-sided die.
+- Optional: a FAT32 or exFAT USB stick for the watch-only kit.
 
 ## Build
 
@@ -81,6 +99,8 @@ These are the things an emulator cannot prove. Please record each result.
 - [ ] A phone's Wi-Fi and Bluetooth scans show no new device near the Pi.
 - [ ] The ceremony completes, and option 2 reproduces the same fingerprint.
 - [ ] Pull the card after the menu appears: the device keeps working.
+- [ ] A phone camera reads a QR code from the screen and the text matches.
+- [ ] The kit saves to a real USB stick and the files open on another machine.
 - [ ] After power-off, the card's contents are unchanged (same SHA-256 when
       read back on another machine).
 
@@ -89,7 +109,7 @@ These are the things an emulator cannot prove. Please record each result.
 ```
 os/build.sh                         pinned Buildroot fetch + build
 os/configs/                         holdfast_rpi_defconfig, holdfast_qemu_defconfig
-os/board/holdfast/                  kernel fragments, boot files, session menu
+os/board/holdfast/                  kernel fragments, boot files, session menu, USB export
 os/package/holdfast-node/           official Node.js binary, pinned by hash
 os/package/holdfast-vault/          the tool bundle from dist/
 os/test/qemu-boot.py                serial-console boot test
@@ -97,8 +117,8 @@ os/test/qemu-boot.py                serial-console boot test
 
 ## Not done yet
 
-- Exporting the watch-only kit (USB stick or on-screen QR). For now the
-  ceremony shows addresses and descriptors on screen only.
+- QR codes have been decoded by software but not yet scanned off a real
+  screen with a phone, and USB export has only run against an emulated stick.
 - Byte-for-byte reproducibility of the image has not been verified.
 - A kernel without loadable-module support at all, and a build for a board
   with no radio chip (Pi 2B), are planned hardening steps.

@@ -1,0 +1,15 @@
+# A USB stick is the only removable storage the Vault talks to, and only to
+# write the public watch-only kit. FAT32 and exFAT cover sticks as sold.
+CONFIG_SCSI=y
+CONFIG_BLK_DEV_SD=y
+CONFIG_USB=y
+CONFIG_USB_STORAGE=y
+CONFIG_MSDOS_PARTITION=y
+CONFIG_EFI_PARTITION=y
+CONFIG_VFAT_FS=y
+CONFIG_FAT_DEFAULT_UTF8=y
+CONFIG_EXFAT_FS=y
+CONFIG_NLS=y
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+CONFIG_NLS_UTF8=y

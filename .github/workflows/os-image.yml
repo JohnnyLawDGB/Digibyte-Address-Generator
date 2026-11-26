@@ -35,7 +35,7 @@ jobs:
         run: os/build.sh ${{ matrix.target }}
       - name: Boot test in QEMU
         if: matrix.target == 'qemu'
-        run: python3 os/test/qemu-boot.py os/output/qemu/images/Image
+        run: python3 os/test/qemu-boot.py os/output/qemu/images/Image os/output/qemu/host
       - name: Package Raspberry Pi image
         if: matrix.target == 'rpi'
         run: |

@@ -1,0 +1,4 @@
+# Emulator only: a USB controller, so the boot test can plug in a USB stick.
+CONFIG_USB_SUPPORT=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_XHCI_PCI=y
