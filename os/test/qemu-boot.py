@@ -254,19 +254,36 @@ if stick:
     names = sorted(os.path.basename(n) for n in mdir)
     if len(names) != 4 or any("monero" in n for n in names):
         fail("unexpected files on the stick: %r" % names)
-    text = ""
+    text, values = "", set()
+
+    def strings(node):
+        if isinstance(node, str):
+            values.add(node)
+        elif isinstance(node, dict):
+            for v in node.values():
+                strings(v)
+        elif isinstance(node, list):
+            for v in node:
+                strings(v)
+
     for n in names:
         raw = subprocess.run([os.path.join(host, "bin", "mtype"), "-i", stick, "::/holdfast-vault/" + n],
                              capture_output=True, text=True, check=True).stdout
         kit = json.loads(raw)
         if kit["masterFingerprint"] != fp or kit["containsPrivateKeys"] is not False:
             fail("kit %s does not belong to this seed" % n)
+        strings(kit)
         text += raw
     if first not in text:
         fail("the first DigiByte address is not in the exported kit")
+    # Compare against whole string values: some JSON keys ("label", "index",
+    # "network") and fixed strings ("watch") contain BIP39 words themselves.
     for w in set(words):
-        if len(w) > 4 and re.search(r"\b%s\b" % w, text):
+        if w in values:
             fail("seed word %r found on the stick" % w)
+    for i in range(len(words) - 2):
+        if re.search(r"\b" + r"\s+".join(words[i:i + 3]) + r"\b", text):
+            fail("seed words %d-%d found on the stick in order" % (i + 1, i + 3))
     if re.search(r"prv[A-Za-z0-9]{20}", text):
         fail("a private extended key is on the stick")
     step("stick holds 4 public kits for this seed and no secrets")

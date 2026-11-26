@@ -110,7 +110,12 @@ test('full ceremony → watch kit → recovery drill', async () => {
   const text = fs.readFileSync(kitFile, 'utf8');
   const kit = JSON.parse(text);
   assert.doesNotMatch(text, /prv|hunter2/);
-  for (const w of new Set(words)) if (w.length > 4) assert.doesNotMatch(text, new RegExp(`"${w}"`));
+  // Compare against the kit's string values only: some JSON keys ("label",
+  // "index", "account", "network", "change") are BIP39 words themselves.
+  const values = new Set();
+  JSON.parse(text, (k, v) => (typeof v === 'string' && values.add(v), v));
+  for (const w of new Set(words)) assert.ok(!values.has(w), `seed word "${w}" is a value in the kit`);
+  for (let i = 0; i + 3 <= words.length; i++) assert.doesNotMatch(text, new RegExp(`\\b${words.slice(i, i + 3).join('\\s+')}\\b`));
   assert.equal(kit.passphraseUsed, true);
   assert.equal(kit.scripts.length, 4);
   assert.equal(kit.scripts[0].addresses.length, 3);
