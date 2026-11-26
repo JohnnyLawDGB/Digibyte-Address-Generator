@@ -159,3 +159,20 @@ test('--require-dice insists on a full set of rolls', async () => {
   assert.equal(run(['--require-dice', '--no-dice']).status, 2);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('--require-passphrase refuses an empty passphrase', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
+  let asked = 0;
+  const res = await drive([...TEST_FLAGS, '--require-passphrase', '--no-dice', '--no-kit', '--words', '12'], dir, (line) => {
+    if (line.startsWith('BIP39 passphrase')) return ['', 'correct horse'][asked++];
+    if (line.startsWith('Repeat passphrase')) return 'correct horse';
+    if (line.startsWith('Press Enter when you have written')) return '';
+    if (line.startsWith('Seed phrase:')) return 'x';
+    return null;
+  });
+  assert.equal(asked, 2);
+  assert.match(res.stdout, /A passphrase is required in this mode/);
+  assert.doesNotMatch(res.stdout, /Enter for none/);
+  assert.equal(run(['--require-passphrase', '--no-passphrase']).status, 2);
+  fs.rmSync(dir, { recursive: true });
+});

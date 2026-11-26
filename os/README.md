@@ -25,6 +25,21 @@ yet been confirmed on real hardware. Do not use it for real funds yet.
 - **Dice are mandatory.** A freshly booted device has had little time to
   gather randomness, so the ceremony requires a full set of dice rolls, mixed
   with the system generator.
+- **24 words, or 24 + 1.** The menu offers a 24-word seed on its own, or a
+  24-word seed with a passphrase (the "25th word"), which is then required.
+
+## What you need
+
+- **Raspberry Pi 4 Model B, any memory size** (1, 2, 4 or 8 GB), or a
+  **Pi 400**. The system uses well under 1 GB. Other models (Pi 3, Pi 5,
+  Zero 2 W, Compute Module 4) will not boot this image.
+- **A microSD card of 1 GB or more.** The image is 256 MB and is only read,
+  once, at power-on, so speed class and endurance rating do not matter. Use a
+  name-brand card from a seller you trust (counterfeit cards are common),
+  and keep it for this purpose only.
+- A micro-HDMI cable and screen, a wired USB keyboard, and a 5 V USB-C power
+  supply. Avoid wireless keyboards: their dongle is a radio.
+- A six-sided die.
 
 ## Build
 

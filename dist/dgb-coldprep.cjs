@@ -6560,6 +6560,7 @@ Ceremony options:
   --require-dice       Refuse to continue without a full set of dice rolls,
                        mixed with the system RNG (for freshly booted devices)
   --no-passphrase      Do not ask for a BIP39 passphrase
+  --require-passphrase Insist on a BIP39 passphrase ("24+1")
   --quick-verify       Quiz 4 random words instead of retyping the whole phrase
   --out DIR            Write the public watch-only kit to DIR without asking
   --no-kit             Never write anything to disk
@@ -6591,6 +6592,7 @@ function parseArgs(argv) {
     "--dice-only": "diceOnly",
     "--require-dice": "requireDice",
     "--no-passphrase": "noPassphrase",
+    "--require-passphrase": "requirePassphrase",
     "--quick-verify": "quickVerify",
     "--no-kit": "noKit",
     "--show-descriptors": "showDescriptors",
@@ -6620,6 +6622,7 @@ function parseArgs(argv) {
   if (!Number.isInteger(opts.account) || opts.account < 0) throw new Error("--account must be a non-negative integer");
   if (opts.diceOnly && opts.noDice) throw new Error("--dice-only and --no-dice are mutually exclusive");
   if (opts.requireDice && (opts.noDice || opts.diceOnly)) throw new Error("--require-dice cannot be combined with --no-dice or --dice-only");
+  if (opts.requirePassphrase && opts.noPassphrase) throw new Error("--require-passphrase and --no-passphrase are mutually exclusive");
   if (opts.out && opts.noKit) throw new Error("--out and --no-kit are mutually exclusive");
   return opts;
 }
@@ -6795,9 +6798,13 @@ function writeKit(wallet, dir) {
   if (diffs.length) throw new Error(`Watch kit read-back mismatch: ${diffs.join("; ")}`);
   return file;
 }
-async function askPassphrase(term, { confirm }) {
+async function askPassphrase(term, { confirm, required = false }) {
   for (; ; ) {
-    const p1 = await term.ask("BIP39 passphrase (Enter for none): ", { hidden: true });
+    const p1 = await term.ask(required ? "BIP39 passphrase: " : "BIP39 passphrase (Enter for none): ", { hidden: true });
+    if (!p1 && required) {
+      out(red("A passphrase is required in this mode."));
+      continue;
+    }
     if (!p1) return "";
     if (!confirm) return p1;
     const p2 = await term.ask("Repeat passphrase: ", { hidden: true });
@@ -6899,10 +6906,11 @@ async function ceremony(opts) {
     out();
     let passphrase = "";
     if (!opts.noPassphrase) {
-      out(bold('Step 2 — Optional passphrase ("25th word")'));
+      out(bold(`Step 2 — ${opts.requirePassphrase ? "Passphrase" : "Optional passphrase"} ("25th word")`));
       out("A passphrase means a thief who finds the written words still cannot spend.");
-      out(yellow("It is NOT recoverable: forget it and the coins are gone. Leave empty if unsure."));
-      passphrase = await askPassphrase(term, { confirm: true });
+      out(yellow(`It is NOT recoverable: forget it and the coins are gone.${opts.requirePassphrase ? "" : " Leave empty if unsure."}`));
+      out("Write it down exactly (capitals and spaces count) and store it apart from the words.");
+      passphrase = await askPassphrase(term, { confirm: true, required: opts.requirePassphrase });
       out();
     }
     const wallet = deriveWallet(mnemonic, passphrase, { network, account: opts.account, count: opts.count });

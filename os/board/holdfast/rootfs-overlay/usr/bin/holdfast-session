@@ -18,30 +18,32 @@ while :; do
   Air-gapped cold storage. This device has no network hardware enabled,
   runs entirely from memory, and forgets everything when powered off.
 
-    1) Create a new cold-storage seed
-    2) Recovery drill (check a written backup)
-    3) Check an address
-    4) Self-test
-    5) Power off
+    1) New seed: 24 words
+    2) New seed: 24 words + passphrase ("24+1")
+    3) Recovery drill (check a written backup)
+    4) Check an address
+    5) Self-test
+    6) Power off
 
 BANNER
-	printf '  Choose 1-5: '
+	printf '  Choose 1-6: '
 	read -r choice || exit 0
 	clear
 	case "$choice" in
-	1) node "$APP" --require-dice --no-kit || pause ;;
-	2) node "$APP" verify || pause ;;
-	3)
+	1) node "$APP" --require-dice --no-kit --no-passphrase || pause ;;
+	2) node "$APP" --require-dice --no-kit --require-passphrase || pause ;;
+	3) node "$APP" verify || pause ;;
+	4)
 		printf 'Address: '
 		read -r addr
 		node "$APP" check-address "$addr"
 		pause
 		;;
-	4)
+	5)
 		node "$APP" selftest
 		pause
 		;;
-	5)
+	6)
 		clear
 		echo 'Powering off. Remove power once the screen goes blank.'
 		poweroff -f
