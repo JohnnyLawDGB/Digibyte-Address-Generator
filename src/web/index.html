@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '__SCRIPT_HASH__'; style-src '__STYLE_HASH__'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DigiByte Cold Prep</title>
+<style>__STYLE__</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>DigiByte Cold Prep <span id="version" class="muted"></span></h1>
+    <p class="muted">Offline seed and address generator for air-gapped cold storage. This page makes no network requests and its security policy forbids any.</p>
+    <ul id="checks" class="checks"></ul>
+    <label id="practiceRow" class="practice" hidden><input type="checkbox" id="practice"> Practice mode: I understand this environment is not safe and I will <strong>not</strong> fund anything generated here.</label>
+    <nav>
+      <button id="tabNew" class="tab active" type="button">Create new seed</button>
+      <button id="tabVerify" class="tab" type="button">Recovery drill</button>
+    </nav>
+  </header>
+
+  <section id="stepSetup">
+    <h2>1 · Set up</h2>
+    <div class="row">
+      <label>Seed length
+        <select id="words"><option value="24">24 words (256-bit)</option><option value="12">12 words (128-bit)</option></select>
+      </label>
+      <label>Network
+        <select id="network"><option value="mainnet">DigiByte mainnet</option><option value="testnet">Testnet</option></select>
+      </label>
+      <label>Addresses per type
+        <input id="count" type="number" min="1" max="100" value="5">
+      </label>
+    </div>
+    <label>Dice rolls <span class="muted">(optional, digits 1–6; 100 rolls = full 256-bit strength). Hashed together with the browser's random generator so neither has to be trusted alone.</span>
+      <textarea id="dice" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    </label>
+    <label class="inline"><input type="checkbox" id="diceOnly"> Dice only (seed = SHA-256 of the rolls; auditable by hand)</label>
+    <div class="row">
+      <label>Passphrase <span class="muted">(optional "25th word")</span>
+        <input id="pass1" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <label>Repeat passphrase
+        <input id="pass2" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+    </div>
+    <p class="warn small">A passphrase is not recoverable. Forget it and the coins are gone. Leave empty if unsure.</p>
+    <p id="setupError" class="error" role="alert"></p>
+    <button id="generate" class="primary" type="button">Generate seed</button>
+  </section>
+
+  <section id="stepWrite" hidden>
+    <h2>2 · Write down these words, in order</h2>
+    <p>By hand, on paper or metal. Never photograph, print, copy or store them in a file.</p>
+    <ol id="mnemonic" class="mnemonic"></ol>
+    <p>Master fingerprint: <code id="fpWrite"></code> <span class="muted">(safe to write next to the words)</span></p>
+    <p class="muted small" id="entropySource"></p>
+    <button id="written" class="primary" type="button">I have written and double-checked every word</button>
+  </section>
+
+  <section id="stepProve" hidden>
+    <h2>3 · Prove the backup</h2>
+    <p>Type the whole phrase back from your written copy.</p>
+    <textarea id="retype" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <p id="proveError" class="error" role="alert"></p>
+    <button id="prove" class="primary" type="button">Check my backup</button>
+  </section>
+
+  <section id="stepVerify" hidden>
+    <h2>Recovery drill</h2>
+    <p>Enter the seed phrase from your written backup to confirm it restores the same wallet.</p>
+    <label>Seed phrase
+      <textarea id="vMnemonic" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    </label>
+    <div class="row">
+      <label>Passphrase <span class="muted">(if you set one)</span>
+        <input id="vPass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <label>Network
+        <select id="vNetwork"><option value="mainnet">DigiByte mainnet</option><option value="testnet">Testnet</option></select>
+      </label>
+    </div>
+    <label>Watch-only kit JSON <span class="muted">(optional: paste to compare automatically)</span>
+      <textarea id="vKit" rows="3" autocomplete="off" spellcheck="false"></textarea>
+    </label>
+    <p id="verifyError" class="error" role="alert"></p>
+    <button id="verify" class="primary" type="button">Restore and compare</button>
+  </section>
+
+  <section id="stepResult" hidden>
+    <h2 id="resultTitle">4 · Your cold-storage addresses</h2>
+    <p id="match" class="match" hidden></p>
+    <dl class="facts">
+      <dt>Network</dt><dd id="rNetwork"></dd>
+      <dt>Master fingerprint</dt><dd><code id="rFp"></code></dd>
+      <dt>Passphrase</dt><dd id="rPass"></dd>
+    </dl>
+    <div id="scripts"></div>
+    <div id="kitBox">
+      <h3>Watch-only kit <span class="muted">(public keys only, cannot spend)</span></h3>
+      <p class="small">Carry this to your online machine to watch the balance and create receive addresses. It reveals all your addresses to whoever holds it. Import into DigiByte Core v8.22+ with <code>importdescriptors</code> using the <code>importdescriptors</code> array inside.</p>
+      <textarea id="kit" rows="6" readonly spellcheck="false"></textarea>
+      <button id="download" type="button">Save kit file</button>
+    </div>
+    <h3>Before you fund it</h3>
+    <ol class="small">
+      <li>Store the written words (and passphrase, separately) somewhere safe from fire, water and theft.</li>
+      <li>Run the recovery drill above and confirm the same fingerprint and addresses come back.</li>
+      <li>Send a small test amount first and confirm it shows in your watch-only wallet.</li>
+      <li>Close this window and power the machine off when done.</li>
+    </ol>
+    <button id="wipe" class="danger" type="button">Wipe and finish</button>
+  </section>
+</main>
+<script>__SCRIPT__</script>
+</body>
+</html>
