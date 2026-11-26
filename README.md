@@ -4,6 +4,9 @@ One-step, air-gapped cold-storage preparation for DigiByte: create a seed,
 prove the backup, and walk away with receive addresses and a watch-only kit
 for your online wallet. Private keys never touch a disk or a network.
 
+DigiByte is the default. The same seed can also produce Bitcoin, Litecoin and
+Dogecoin addresses (`--chains all`), so one written backup covers all four.
+
 This is version 2 of the original `generator.js` script, rebuilt around
 current standards and a much smaller, audited dependency set.
 
@@ -14,6 +17,7 @@ current standards and a much smaller, audited dependency set.
 | **Seed** | BIP39, 24 words (256-bit) or 12 words, optional passphrase ("25th word") |
 | **Entropy** | System CSPRNG, optionally hashed together with your own dice rolls, or dice only (seed = SHA-256 of the rolls, checkable by hand) |
 | **Addresses** | Native SegWit `dgb1q…` (BIP84, recommended), Taproot `dgb1p…` (BIP86), Wrapped SegWit `S…` (BIP49), Legacy `D…` (BIP44), coin type 20 |
+| **Other chains** | Bitcoin and Litecoin (the same four address types), Dogecoin (Legacy only; it has no SegWit or Taproot). Each uses its own coin type, so keys never overlap between chains |
 | **Watch-only kit** | Master fingerprint, account xpubs and BIP380 output descriptors with checksums, ready for DigiByte Core `importdescriptors` |
 | **Recovery drill** | Re-enter the words and confirm they reproduce every key in the kit, before any coins are sent |
 
@@ -100,7 +104,8 @@ dgb-coldprep check-address ADDR   validate an address checksum
 dgb-coldprep selftest             run the known-answer tests
 ```
 
-Options: `--words 12|24`, `--count N`, `--account N`, `--testnet`,
+Options: `--chains dgb,btc,ltc,doge|all`, `--words 12|24`, `--count N`,
+`--account N`, `--testnet`, `--require-passphrase`,
 `--no-dice`, `--dice-only`, `--require-dice`, `--no-passphrase`, `--quick-verify`, `--out DIR`,
 `--no-kit`, `--show-descriptors`. Run `--help` for details.
 
@@ -118,6 +123,14 @@ only. Never fund a seed made with them.
 
 ## Limits to know about
 
+- **DigiByte and Dogecoin legacy addresses look identical.** Both start with
+  `D` and use the same version byte, so no checksum can tell them apart.
+  Label them carefully. A coin sent to the other chain's address is
+  recoverable only by someone who knows how to derive that key on the wrong
+  chain.
+- The watch-only kit import commands are written for DigiByte Core. Bitcoin
+  Core and Litecoin Core accept the same descriptors; Dogecoin Core has no
+  descriptor wallets, so use the listed addresses or the account `dgub`.
 - Software cannot reliably erase memory. Power the machine off afterwards.
 - A browser adds extensions and a larger attack surface; prefer the CLI, or
   use a clean profile with no extensions.

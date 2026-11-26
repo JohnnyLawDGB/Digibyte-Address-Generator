@@ -3,6 +3,9 @@
 # shell: this menu is started directly by init and restarted if it exits.
 
 APP=/opt/holdfast/dgb-coldprep.cjs
+# Every chain from the one seed, DigiByte first, three addresses per type so
+# each chain fits on one screen.
+COMMON='--chains all --count 3'
 trap '' INT QUIT TSTP HUP
 
 pause() {
@@ -14,9 +17,11 @@ while :; do
 	clear
 	cat <<'BANNER'
 
-  HoldFast Vault
-  Air-gapped cold storage. This device has no network hardware enabled,
-  runs entirely from memory, and forgets everything when powered off.
+  HoldFast Vault  ·  DigiByte cold storage
+  One seed also covers Bitcoin, Litecoin and Dogecoin.
+
+  This device has no network hardware enabled, runs entirely from memory,
+  and forgets everything when powered off.
 
     1) New seed: 24 words
     2) New seed: 24 words + passphrase ("24+1")
@@ -30,13 +35,15 @@ BANNER
 	read -r choice || exit 0
 	clear
 	case "$choice" in
-	1) node "$APP" --require-dice --no-kit --no-passphrase || pause ;;
-	2) node "$APP" --require-dice --no-kit --require-passphrase || pause ;;
-	3) node "$APP" verify || pause ;;
+	1) node "$APP" $COMMON --require-dice --no-kit --no-passphrase || pause ;;
+	2) node "$APP" $COMMON --require-dice --no-kit --require-passphrase || pause ;;
+	3) node "$APP" verify $COMMON || pause ;;
 	4)
+		printf 'Chain (dgb, btc, ltc, doge) [dgb]: '
+		read -r chain
 		printf 'Address: '
 		read -r addr
-		node "$APP" check-address "$addr"
+		node "$APP" check-address --chains "${chain:-dgb}" "$addr"
 		pause
 		;;
 	5)

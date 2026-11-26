@@ -6187,22 +6187,30 @@ zoo`.split("\n"));
 
 // src/core.js
 var VERSION = "2.0.0";
+var XPUB = Object.freeze({ public: 76067358, private: 76066276 });
+var ALL_TYPES = Object.freeze(["p2wpkh", "p2tr", "p2sh-p2wpkh", "p2pkh"]);
+var chain2 = (c) => Object.freeze({ scriptTypes: ALL_TYPES, notes: Object.freeze({}), ...c });
 var NETWORKS = Object.freeze({
-  mainnet: Object.freeze({
+  // DigiByte Core. Taproot is buried-active on mainnet since block 21,168,000.
+  mainnet: chain2({
     name: "mainnet",
+    ticker: "DGB",
     label: "DigiByte mainnet",
     pubKeyHash: 30,
     // 30  -> "D..."
     scriptHash: 63,
     // 63  -> "S..."
     bech32: "dgb",
-    bip32: Object.freeze({ public: 76067358, private: 76066276 }),
-    // xpub / xprv
-    coinType: 20
-    // SLIP-44
+    bip32: XPUB,
+    coinType: 20,
+    notes: Object.freeze({
+      p2tr: "Active on DigiByte mainnet since block 21,168,000. Confirm your sending wallet/exchange supports dgb1p… (bech32m) before using.",
+      p2pkh: 'Maximum compatibility, highest fees. DigiByte and Dogecoin legacy addresses both start with "D" and look alike: never send DOGE here.'
+    })
   }),
-  testnet: Object.freeze({
+  testnet: chain2({
     name: "testnet",
+    ticker: "tDGB",
     label: "DigiByte testnet",
     pubKeyHash: 126,
     // 126
@@ -6212,7 +6220,57 @@ var NETWORKS = Object.freeze({
     bip32: Object.freeze({ public: 70617039, private: 70615956 }),
     // tpub / tprv
     coinType: 1
+  }),
+  // Bitcoin Core.
+  bitcoin: chain2({
+    name: "bitcoin",
+    ticker: "BTC",
+    label: "Bitcoin",
+    pubKeyHash: 0,
+    // "1..."
+    scriptHash: 5,
+    // "3..."
+    bech32: "bc",
+    bip32: XPUB,
+    coinType: 0
+  }),
+  // Litecoin Core. P2SH uses the newer "M..." prefix (version 50).
+  litecoin: chain2({
+    name: "litecoin",
+    ticker: "LTC",
+    label: "Litecoin",
+    pubKeyHash: 48,
+    // 48 -> "L..."
+    scriptHash: 50,
+    // 50 -> "M..."
+    bech32: "ltc",
+    bip32: XPUB,
+    coinType: 2
+  }),
+  // Dogecoin Core. No SegWit and no Taproot on Dogecoin: legacy addresses only.
+  dogecoin: chain2({
+    name: "dogecoin",
+    ticker: "DOGE",
+    label: "Dogecoin",
+    pubKeyHash: 30,
+    // 30 -> "D..." (same version byte as DigiByte)
+    scriptHash: 22,
+    // 22
+    bech32: null,
+    bip32: Object.freeze({ public: 49990397, private: 49988504 }),
+    // dgub / dgpv
+    coinType: 3,
+    scriptTypes: Object.freeze(["p2pkh"]),
+    notes: Object.freeze({
+      p2pkh: 'The only address type Dogecoin supports. Dogecoin and DigiByte legacy addresses both start with "D" and look alike: never send DGB here.'
+    })
   })
+});
+var CHAINS = Object.freeze({
+  dgb: NETWORKS.mainnet,
+  btc: NETWORKS.bitcoin,
+  ltc: NETWORKS.litecoin,
+  doge: NETWORKS.dogecoin
 });
 var SCRIPT_TYPES = Object.freeze([
   Object.freeze({
@@ -6228,7 +6286,7 @@ var SCRIPT_TYPES = Object.freeze([
     purpose: 86,
     bip: "BIP86",
     label: "Taproot",
-    note: "Active on DigiByte mainnet since block 21,168,000. Confirm your sending wallet/exchange supports dgb1p… (bech32m) before using.",
+    note: "Confirm your sending wallet/exchange supports bech32m (…1p…) addresses before using.",
     wrap: (key) => `tr(${key})`
   }),
   Object.freeze({
@@ -6335,7 +6393,7 @@ function encodeAddress(typeId, pubkey33, network) {
 function checkAddress(address, network = NETWORKS.mainnet) {
   const addr = String(address).trim();
   const lower = addr.toLowerCase();
-  if (lower.startsWith(network.bech32 + "1")) {
+  if (network.bech32 && lower.startsWith(network.bech32 + "1")) {
     if (addr !== lower && addr !== addr.toUpperCase()) return { valid: false, reason: "Mixed-case bech32" };
     for (const [enc, name] of [[bech32, "bech32"], [bech32m, "bech32m"]]) {
       try {
@@ -6408,7 +6466,7 @@ function deriveWallet(mnemonic, passphrase = "", opts = {}) {
   const root = HDKey.fromMasterSeed(seed, network.bip32);
   seed.fill(0);
   const masterFingerprint = fingerprintHex(root.fingerprint);
-  const scripts = SCRIPT_TYPES.map((type) => {
+  const scripts = SCRIPT_TYPES.filter((type) => network.scriptTypes.includes(type.id)).map((type) => {
     const origin = `${type.purpose}h/${network.coinType}h/${account}h`;
     const accountPath = `m/${type.purpose}'/${network.coinType}'/${account}'`;
     const acct = root.derive(accountPath);
@@ -6429,7 +6487,7 @@ function deriveWallet(mnemonic, passphrase = "", opts = {}) {
       type: type.id,
       bip: type.bip,
       label: type.label,
-      note: type.note,
+      note: network.notes[type.id] || type.note,
       accountPath,
       xpub,
       descriptors: {
@@ -6491,7 +6549,7 @@ function compareToKit(wallet, kit) {
   return diffs;
 }
 var ABANDON = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-var BTC = { ...NETWORKS.mainnet, pubKeyHash: 0, scriptHash: 5, bech32: "bc", coinType: 0 };
+var BTC = NETWORKS.bitcoin;
 function selfTest() {
   const results = [];
   const check = (name, got, want) => results.push({ name, ok: got === want, got, want });
@@ -6530,6 +6588,15 @@ function selfTest() {
       check(`DigiByte ${s.type} address decodes`, String(res.valid), "true");
     }
   }
+  for (const [net, vectors] of Object.entries(CHAIN_VECTORS)) {
+    const w = deriveWallet(ABANDON, "", { network: NETWORKS[net], count: 1 });
+    check(`${NETWORKS[net].label} offers exactly its supported address types`, w.scripts.map((x) => x.type).sort().join(), Object.keys(vectors).sort().join());
+    for (const [type, want] of Object.entries(vectors)) {
+      const got = w.scripts.find((x) => x.type === type)?.addresses[0].address;
+      check(`${NETWORKS[net].label} ${type}`, got, want);
+      check(`${NETWORKS[net].label} ${type} address decodes`, String(checkAddress(want, NETWORKS[net]).valid), "true");
+    }
+  }
   check("Address checker rejects a typo", String(checkAddress(dgbAddr("p2wpkh").replace(/.$/, (c) => c === "q" ? "p" : "q")).valid), "false");
   return { ok: results.every((r) => r.ok), results };
 }
@@ -6539,9 +6606,18 @@ var DGB_VECTORS = Object.freeze({
   p2wpkh: "dgb1q9gmf0pv8jdymcly6lz6fl7lf6mhslsd72e2jq8",
   p2tr: "dgb1pcevt23hht82rkdrjdpwzstmqyj4ngyy42r9cu73rl4n9h5vu6hgsx5tm5q"
 });
+var CHAIN_VECTORS = Object.freeze({
+  litecoin: Object.freeze({
+    p2pkh: "LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez",
+    "p2sh-p2wpkh": "M7wtsL7wSHDBJVMWWhtQfTMSYYkyooAAXM",
+    p2wpkh: "ltc1qjmxnz78nmc8nq77wuxh25n2es7rzm5c2rkk4wh",
+    p2tr: "ltc1puht8rk95c53q3u9w3pf9h3jfcutcrl9lxc7rqsdthjrse4k6sn7q9tuqm9"
+  }),
+  dogecoin: Object.freeze({ p2pkh: "DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC" })
+});
 
 // src/cli.js
-var HELP = `dgb-coldprep ${VERSION} — air-gapped DigiByte cold-storage prep
+var HELP = `dgb-coldprep ${VERSION} — air-gapped cold-storage prep for DigiByte (plus BTC, LTC, DOGE)
 
 Usage:
   dgb-coldprep [options]            Run the full cold-storage ceremony (default)
@@ -6554,6 +6630,8 @@ Ceremony options:
   --words 12|24        Seed phrase length (default 24 = 256-bit)
   --count N            Receive addresses to show per type (default 5)
   --account N          BIP44 account index (default 0)
+  --chains LIST        Chains to derive from the one seed, comma separated:
+                       dgb (default), btc, ltc, doge, or "all"
   --testnet            Derive for DigiByte testnet
   --no-dice            Do not ask for dice rolls (system RNG only)
   --dice-only          Derive entropy only from dice (auditable by hand)
@@ -6568,7 +6646,10 @@ Ceremony options:
 
 Verify options:
   --kit FILE           Compare against a saved watch-only kit
-  (also --count, --account, --testnet, --no-passphrase)
+  (also --count, --account, --chains, --testnet, --no-passphrase)
+
+check-address options:
+  --chains NAME        Chain the address belongs to (default dgb)
 
 Safety overrides (for testing only — do not use with real funds):
   --allow-online       Continue even though a network interface is up
@@ -6602,7 +6683,7 @@ function parseArgs(argv) {
     "-h": "help",
     "--version": "version"
   };
-  const values = { "--words": "words", "--count": "count", "--account": "account", "--out": "out", "--kit": "kit" };
+  const values = { "--words": "words", "--count": "count", "--account": "account", "--out": "out", "--kit": "kit", "--chains": "chains", "--chain": "chains" };
   const args = [...argv];
   while (args.length) {
     const a = args.shift();
@@ -6618,6 +6699,7 @@ function parseArgs(argv) {
   if (opts.positional.length && commands.includes(opts.positional[0])) opts.command = opts.positional.shift();
   else if (opts.positional.length) throw new Error(`Unknown command: ${opts.positional[0]}`);
   wordsToBits(opts.words);
+  opts.networks = parseChains(opts);
   if (!Number.isInteger(opts.count) || opts.count < 1 || opts.count > 1e3) throw new Error("--count must be 1-1000");
   if (!Number.isInteger(opts.account) || opts.account < 0) throw new Error("--account must be a non-negative integer");
   if (opts.diceOnly && opts.noDice) throw new Error("--dice-only and --no-dice are mutually exclusive");
@@ -6625,6 +6707,20 @@ function parseArgs(argv) {
   if (opts.requirePassphrase && opts.noPassphrase) throw new Error("--require-passphrase and --no-passphrase are mutually exclusive");
   if (opts.out && opts.noKit) throw new Error("--out and --no-kit are mutually exclusive");
   return opts;
+}
+function parseChains(opts) {
+  if (opts.testnet) {
+    if (opts.chains) throw new Error("--testnet cannot be combined with --chains");
+    return [NETWORKS.testnet];
+  }
+  const names = String(opts.chains || "dgb").toLowerCase().split(",").flatMap((n) => n.trim() === "all" ? Object.keys(CHAINS) : [n]);
+  const picked = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!CHAINS[name]) throw new Error(`Unknown chain "${name}". Choose from: ${Object.keys(CHAINS).join(", ")}, all`);
+    if (!picked.includes(CHAINS[name])) picked.push(CHAINS[name]);
+  }
+  return picked.sort((a, b) => Object.values(CHAINS).indexOf(a) - Object.values(CHAINS).indexOf(b));
 }
 var Terminal = class {
   constructor() {
@@ -6728,7 +6824,7 @@ function preflight(opts) {
   if (hash) out(dim(`SHA-256 of this program: ${hash}`));
   out();
   const n = runSelfTest();
-  out(`${green("✔")} Self-test passed (${n} known-answer checks: BIP39, BIP32, BIP44/49/84/86, BIP380, DigiByte)`);
+  out(`${green("✔")} Self-test passed (${n} known-answer checks: BIP39, BIP32, BIP44/49/84/86, BIP380, DGB, BTC, LTC, DOGE)`);
   if (!(process.stdin.isTTY && process.stdout.isTTY)) {
     if (!opts.unsafeNoTty) {
       throw new Error(
@@ -6764,7 +6860,7 @@ function printMnemonic(mnemonic) {
   }
 }
 function printWallet(wallet, { showDescriptors }) {
-  out(`${bold("Network:")}            ${NETWORKS[wallet.network].label}`);
+  out(`${bold("Chain:")}              ${bold(NETWORKS[wallet.network].label)} (${NETWORKS[wallet.network].ticker})`);
   out(`${bold("Master fingerprint:")} ${wallet.masterFingerprint}   ${dim("(write this on your backup; it identifies the seed without revealing it)")}`);
   out(`${bold("BIP39 passphrase:")}   ${wallet.passphraseUsed ? yellow("YES — required for recovery, back it up separately") : "none"}`);
   for (const s of wallet.scripts) {
@@ -6798,6 +6894,16 @@ function writeKit(wallet, dir) {
   if (diffs.length) throw new Error(`Watch kit read-back mismatch: ${diffs.join("; ")}`);
   return file;
 }
+async function printWallets(term, wallets, opts) {
+  for (let i = 0; i < wallets.length; i++) {
+    printWallet(wallets[i], opts);
+    if (i < wallets.length - 1) {
+      await term.ask(`Press Enter for ${NETWORKS[wallets[i + 1].network].label} (${i + 2} of ${wallets.length})… `);
+      term.clear();
+    }
+  }
+}
+var deriveAll = (mnemonic, passphrase, opts) => opts.networks.map((network) => deriveWallet(mnemonic, passphrase, { network, account: opts.account, count: opts.count }));
 async function askPassphrase(term, { confirm, required = false }) {
   for (; ; ) {
     const p1 = await term.ask(required ? "BIP39 passphrase: " : "BIP39 passphrase (Enter for none): ", { hidden: true });
@@ -6892,10 +6998,9 @@ async function verifyBackup(term, mnemonic, opts) {
 async function ceremony(opts) {
   preflight(opts);
   const term = new Terminal();
-  const network = opts.testnet ? NETWORKS.testnet : NETWORKS.mainnet;
   let entropy;
   try {
-    out("This creates a new DigiByte cold-storage seed. You need: pen and paper (or a metal backup),");
+    out("This creates a new cold-storage seed. You need: pen and paper (or a metal backup),");
     out("privacy (no cameras, no one watching the screen), and about ten minutes.");
     out();
     const gathered = await gatherEntropy(term, opts);
@@ -6913,7 +7018,8 @@ async function ceremony(opts) {
       passphrase = await askPassphrase(term, { confirm: true, required: opts.requirePassphrase });
       out();
     }
-    const wallet = deriveWallet(mnemonic, passphrase, { network, account: opts.account, count: opts.count });
+    const wallets = deriveAll(mnemonic, passphrase, opts);
+    const wallet = wallets[0];
     out(bold(`Step 3 — Write down these ${opts.words} words, in order`));
     out("By hand, on paper or metal. Never photograph, print, type into a phone or store in a file.");
     out();
@@ -6928,12 +7034,15 @@ async function ceremony(opts) {
       term.clear();
       throw new Error("Backup verification failed. Nothing was saved; this seed is discarded. Start again.");
     }
-    const again = deriveWallet(mnemonic, passphrase, { network, account: opts.account, count: opts.count });
-    if (JSON.stringify(again) !== JSON.stringify(wallet)) throw new Error("Internal error: derivation is not deterministic");
+    if (JSON.stringify(deriveAll(mnemonic, passphrase, opts)) !== JSON.stringify(wallets)) throw new Error("Internal error: derivation is not deterministic");
     term.clear();
     out(`${green("✔")} Backup verified. The seed words will not be shown again.`);
     out();
     out(bold("Step 5 — Your cold-storage addresses"));
+    if (wallets.length > 1) {
+      out(`One seed, ${wallets.length} chains: ${wallets.map((w) => NETWORKS[w.network].ticker).join(", ")}. The same written words restore all of them.`);
+      out();
+    }
     let dir = opts.out;
     if (!opts.noKit && !dir) {
       out("A watch-only kit (addresses, xpubs, descriptors — no private keys) lets an online wallet");
@@ -6942,13 +7051,17 @@ async function ceremony(opts) {
       if (await term.confirm(`Write the watch-only kit to ${process.cwd()}?`, true)) dir = process.cwd();
       out();
     }
-    printWallet(wallet, { showDescriptors: opts.showDescriptors || !dir });
+    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors || !dir });
     if (dir) {
-      const file = writeKit(wallet, dir);
-      out(`${green("✔")} Watch-only kit written and read back: ${bold(file)}`);
-      out(dim("  Import on an online DigiByte Core (v8.22+) with:"));
-      out(dim('    digibyte-cli createwallet "cold-watch" true true "" false true'));
-      out(dim(`    digibyte-cli -rpcwallet=cold-watch importdescriptors "$(jq -c .importdescriptors ${import_node_path.default.basename(file)})"`));
+      for (const w of wallets) {
+        const file = writeKit(w, dir);
+        out(`${green("✔")} ${NETWORKS[w.network].ticker} watch-only kit written and read back: ${bold(file)}`);
+        if (w.network === "mainnet") {
+          out(dim("  Import on an online DigiByte Core (v8.22+) with:"));
+          out(dim('    digibyte-cli createwallet "cold-watch" true true "" false true'));
+          out(dim(`    digibyte-cli -rpcwallet=cold-watch importdescriptors "$(jq -c .importdescriptors ${import_node_path.default.basename(file)})"`));
+        }
+      }
       out();
     }
     out(bold("Before you fund it"));
@@ -6967,7 +7080,6 @@ async function ceremony(opts) {
 async function verifyCommand(opts) {
   preflight(opts);
   const term = new Terminal();
-  const network = opts.testnet ? NETWORKS.testnet : NETWORKS.mainnet;
   try {
     out(bold("Recovery drill"));
     out("Enter the seed phrase from your written backup to confirm it restores the same wallet.");
@@ -6980,11 +7092,14 @@ async function verifyCommand(opts) {
     }
     const passphrase = opts.noPassphrase ? "" : await askPassphrase(term, { confirm: false });
     term.clear();
-    const wallet = deriveWallet(mnemonic, passphrase, { network, account: opts.account, count: opts.count });
-    printWallet(wallet, { showDescriptors: opts.showDescriptors });
+    const kit = opts.kit ? JSON.parse(import_node_fs.default.readFileSync(opts.kit, "utf8")) : null;
+    if (kit && !opts.chains && !opts.testnet && NETWORKS[kit.network]) opts.networks = [NETWORKS[kit.network]];
+    const wallets = deriveAll(mnemonic, passphrase, opts);
+    await printWallets(term, wallets, { showDescriptors: opts.showDescriptors });
     let ok = true;
     if (opts.kit) {
-      const diffs = compareToKit(wallet, JSON.parse(import_node_fs.default.readFileSync(opts.kit, "utf8")));
+      const wallet = wallets.find((w) => w.network === kit.network) || wallets[0];
+      const diffs = compareToKit(wallet, kit);
       if (diffs.length) {
         ok = false;
         out(red(`✘ MISMATCH against ${opts.kit}:`));
@@ -7005,10 +7120,14 @@ async function verifyCommand(opts) {
 function checkAddressCommand(opts) {
   const addr = opts.positional[0];
   if (!addr) throw new Error("Usage: dgb-coldprep check-address ADDRESS");
-  const network = opts.testnet ? NETWORKS.testnet : NETWORKS.mainnet;
+  if (opts.networks.length !== 1) throw new Error("check-address takes one chain, e.g. --chains btc");
+  const network = opts.networks[0];
   const res = checkAddress(addr, network);
   if (res.valid) out(`${green("✔")} Valid ${network.label} address (${res.type})`);
   else out(`${red("✘")} INVALID: ${res.reason}`);
+  if (res.valid && res.type === "p2pkh" && network.pubKeyHash === 30) {
+    out(yellow("  Note: DigiByte and Dogecoin legacy addresses share this format. The checksum cannot tell them apart."));
+  }
   return res.valid ? 0 : 1;
 }
 async function main(argv = process.argv.slice(2)) {

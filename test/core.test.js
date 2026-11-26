@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CHAINS,
+  CHAIN_VECTORS,
   DGB_VECTORS,
   NETWORKS,
   buildWatchKit,
@@ -146,4 +148,35 @@ test('input bounds', () => {
   const a1 = deriveWallet(ABANDON, '', { account: 1 });
   assert.match(a1.scripts[0].accountPath, /\/1'$/);
   assert.notEqual(addr(a1, 'p2wpkh'), DGB_VECTORS.p2wpkh);
+});
+
+test('Bitcoin, Litecoin and Dogecoin derive from the same seed with their own parameters', () => {
+  const btc = deriveWallet(ABANDON, '', { network: NETWORKS.bitcoin });
+  assert.equal(addr(btc, 'p2wpkh'), 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu'); // BIP84 vector
+  assert.equal(addr(btc, 'p2tr'), 'bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr'); // BIP86 vector
+  const ltc = deriveWallet(ABANDON, '', { network: NETWORKS.litecoin });
+  for (const [type, want] of Object.entries(CHAIN_VECTORS.litecoin)) assert.equal(addr(ltc, type), want);
+  assert.match(ltc.scripts[0].accountPath, /^m\/84'\/2'\/0'$/);
+  const doge = deriveWallet(ABANDON, '', { network: NETWORKS.dogecoin });
+  assert.deepEqual(doge.scripts.map((s) => s.type), ['p2pkh']); // no SegWit or Taproot on Dogecoin
+  assert.equal(addr(doge, 'p2pkh'), CHAIN_VECTORS.dogecoin.p2pkh);
+  assert.match(doge.scripts[0].xpub, /^dgub/);
+  assert.match(doge.scripts[0].accountPath, /^m\/44'\/3'\/0'$/);
+  // One seed, one fingerprint, different keys per chain.
+  const all = Object.values(CHAINS).map((network) => deriveWallet(ABANDON, '', { network }));
+  assert.deepEqual([...new Set(all.map((w) => w.masterFingerprint))], ['73c5da0a']);
+  assert.equal(new Set(all.map((w) => w.scripts.at(-1).addresses[0].address)).size, all.length);
+  assert.deepEqual(Object.keys(CHAINS), ['dgb', 'btc', 'ltc', 'doge']); // DigiByte leads
+});
+
+test('addresses are only valid on their own chain, except the DGB/DOGE legacy overlap', () => {
+  assert.equal(checkAddress(CHAIN_VECTORS.litecoin.p2wpkh, NETWORKS.litecoin).valid, true);
+  assert.equal(checkAddress(CHAIN_VECTORS.litecoin.p2wpkh, NETWORKS.mainnet).valid, false);
+  assert.equal(checkAddress(CHAIN_VECTORS.litecoin.p2pkh, NETWORKS.bitcoin).valid, false);
+  assert.equal(checkAddress(DGB_VECTORS.p2wpkh, NETWORKS.dogecoin).valid, false);
+  assert.equal(checkAddress('bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', NETWORKS.bitcoin).valid, true);
+  // Known hazard: both chains use version byte 30, so the formats are identical.
+  assert.equal(checkAddress(DGB_VECTORS.p2pkh, NETWORKS.dogecoin).valid, true);
+  assert.equal(checkAddress(CHAIN_VECTORS.dogecoin.p2pkh, NETWORKS.mainnet).valid, true);
+  assert.match(deriveWallet(ABANDON, '', { network: NETWORKS.dogecoin }).scripts[0].note, /never send DGB here/);
 });

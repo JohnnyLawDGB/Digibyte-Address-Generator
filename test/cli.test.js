@@ -176,3 +176,41 @@ test('--require-passphrase refuses an empty passphrase', async () => {
   assert.equal(run(['--require-passphrase', '--no-passphrase']).status, 2);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('--chains all derives every chain from one seed, DigiByte first', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
+  let words;
+  const res = await drive([...TEST_FLAGS, '--chains', 'doge,all', '--no-dice', '--no-passphrase', '--words', '12', '--count', '1', '--out', dir], dir, (line, all) => {
+    if (line.startsWith('Press Enter when you have written')) return ((words = wordsFrom(all)), '');
+    if (line.startsWith('Seed phrase:')) return words.join(' ');
+    if (line.startsWith('Press Enter for ')) return '';
+    if (line.startsWith('Press Enter to clear')) return '';
+    return null;
+  });
+  assert.equal(res.code, 0, res.stdout + res.stderr);
+  const order = [...res.stdout.matchAll(/^Chain:\s+(\S+)/gm)].map((m) => m[1]);
+  assert.deepEqual(order, ['DigiByte', 'Bitcoin', 'Litecoin', 'Dogecoin']);
+  assert.match(res.stdout, /One seed, 4 chains: DGB, BTC, LTC, DOGE/);
+  const kits = fs.readdirSync(dir).sort().map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
+  assert.deepEqual(kits.map((k) => k.network).sort(), ['bitcoin', 'dogecoin', 'litecoin', 'mainnet']);
+  assert.equal(new Set(kits.map((k) => k.masterFingerprint)).size, 1);
+  assert.match(kits.find((k) => k.network === 'bitcoin').scripts[0].addresses[0].address, /^bc1q/);
+  assert.deepEqual(kits.find((k) => k.network === 'dogecoin').scripts.map((x) => x.type), ['p2pkh']);
+
+  // A kit names its chain, so the recovery drill restores the right one unprompted.
+  const ltcKit = fs.readdirSync(dir).find((f) => f.includes('litecoin'));
+  const drill = await drive(['verify', ...TEST_FLAGS, '--no-passphrase', '--count', '1', '--kit', path.join(dir, ltcKit)], dir, (line) => {
+    if (line.startsWith('Seed phrase:')) return words.join(' ');
+    if (line.startsWith('Press Enter to clear')) return '';
+    return null;
+  });
+  assert.equal(drill.code, 0, drill.stdout + drill.stderr);
+  assert.match(drill.stdout, /Chain:\s+Litecoin/);
+  assert.match(drill.stdout, /MATCH: this backup reproduces/);
+
+  assert.equal(run(['check-address', '--chains', 'btc', 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu']).status, 0);
+  assert.equal(run(['check-address', 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu']).status, 1);
+  assert.match(run(['check-address', '--chains', 'doge', 'DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC']).stdout, /share this format/);
+  assert.equal(run(['--chains', 'xyz']).status, 2);
+  fs.rmSync(dir, { recursive: true });
+});

@@ -53,6 +53,18 @@ def send(text):
     qemu.stdin.flush()
 
 
+def page_through(start):
+    """Step through the one-chain-per-screen pages; return everything shown."""
+    seen = len(buf)
+    for _ in range(8):
+        m = until(r"Press Enter (for \w+ \(\d of \d\)|to clear the screen and exit)", start=seen)
+        if "clear the screen" in m.group(0):
+            return ANSI.sub("", buf[start:])
+        seen = len(buf)
+        send("")
+    fail("too many chain pages")
+
+
 def step(name):
     print("ok   " + name, flush=True)
 
@@ -92,9 +104,16 @@ until(r"Seed phrase: ", start=mark2)
 send(" ".join(words))
 m = until(r"  0  (dgb1q[a-z0-9]+)", start=mark2)
 first = m.group(1)
-until(r"Press Enter to clear the screen and exit", start=mark2)
+shown = page_through(mark2)
 send("")
 step("ceremony completes (fingerprint %s)" % fp)
+chains = re.findall(r"Chain:\s+(\w+)", shown)
+if chains != ["DigiByte", "Bitcoin", "Litecoin", "Dogecoin"]:
+    fail("expected DigiByte, Bitcoin, Litecoin, Dogecoin in that order; saw %r" % chains)
+for prefix in (r"  0  bc1q", r"  0  ltc1q", r"  0  D[1-9A-HJ-NP-Za-km-z]{33}"):
+    if not re.search(prefix, shown):
+        fail("missing address matching %r" % prefix)
+step("one seed shows DigiByte first, then Bitcoin, Litecoin and Dogecoin")
 
 mark = len(buf)
 until(r"Choose 1-6: ", start=mark)
@@ -106,9 +125,9 @@ until(r"BIP39 passphrase[^\n]*: ", start=mark)
 send("")
 until(r"Master fingerprint:\s+%s" % fp, start=mark)
 until(re.escape(first), start=mark)
-step("recovery drill reproduces the same fingerprint and address")
-until(r"Press Enter to clear the screen and exit", start=mark)
+page_through(mark)
 send("")
+step("recovery drill reproduces the same fingerprint and address")
 
 mark = len(buf)
 until(r"Choose 1-6: ", start=mark)
@@ -129,7 +148,7 @@ send("")
 until(r"Seed phrase: ", start=mark)
 send(" ".join(words2))
 until(r"BIP39 passphrase:\s+YES", start=mark)
-until(r"Press Enter to clear the screen and exit", start=mark)
+page_through(mark)
 send("")
 step("24+1 ceremony requires and uses a passphrase")
 

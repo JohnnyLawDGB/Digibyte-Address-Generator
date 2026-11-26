@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/uHIhd2Ds79h0q5u4u+j+ciR7PSKsQuizqAPYZok4Ec='; style-src 'sha256-dg0n1HhE1UjlG11c9PP/F6edFUDnV83ltJIWM4e8K8s='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cibxQvBnR823bKnPuRls7PY8KIj8I0xzu0R4tUzELxY='; style-src 'sha256-dg0n1HhE1UjlG11c9PP/F6edFUDnV83ltJIWM4e8K8s='; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DigiByte Cold Prep</title>
@@ -62,8 +62,8 @@ details { margin-top:6px; } details pre { white-space:pre-wrap; overflow-wrap:an
       <label>Seed length
         <select id="words"><option value="24">24 words (256-bit)</option><option value="12">12 words (128-bit)</option></select>
       </label>
-      <label>Network
-        <select id="network"><option value="mainnet">DigiByte mainnet</option><option value="testnet">Testnet</option></select>
+      <label>Chain
+        <select id="network"><option value="mainnet">DigiByte</option><option value="bitcoin">Bitcoin</option><option value="litecoin">Litecoin</option><option value="dogecoin">Dogecoin</option><option value="testnet">DigiByte testnet</option></select>
       </label>
       <label>Addresses per type
         <input id="count" type="number" min="1" max="100" value="5">
@@ -113,8 +113,8 @@ details { margin-top:6px; } details pre { white-space:pre-wrap; overflow-wrap:an
       <label>Passphrase <span class="muted">(if you set one)</span>
         <input id="vPass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
       </label>
-      <label>Network
-        <select id="vNetwork"><option value="mainnet">DigiByte mainnet</option><option value="testnet">Testnet</option></select>
+      <label>Chain
+        <select id="vNetwork"><option value="mainnet">DigiByte</option><option value="bitcoin">Bitcoin</option><option value="litecoin">Litecoin</option><option value="dogecoin">Dogecoin</option><option value="testnet">DigiByte testnet</option></select>
       </label>
     </div>
     <label>Watch-only kit JSON <span class="muted">(optional: paste to compare automatically)</span>
@@ -128,7 +128,7 @@ details { margin-top:6px; } details pre { white-space:pre-wrap; overflow-wrap:an
     <h2 id="resultTitle">4 · Your cold-storage addresses</h2>
     <p id="match" class="match" hidden></p>
     <dl class="facts">
-      <dt>Network</dt><dd id="rNetwork"></dd>
+      <dt>Chain</dt><dd id="rNetwork"></dd>
       <dt>Master fingerprint</dt><dd><code id="rFp"></code></dd>
       <dt>Passphrase</dt><dd id="rPass"></dd>
     </dl>
@@ -6313,22 +6313,30 @@ zoo`.split("\n"));
 
   // src/core.js
   var VERSION = "2.0.0";
+  var XPUB = Object.freeze({ public: 76067358, private: 76066276 });
+  var ALL_TYPES = Object.freeze(["p2wpkh", "p2tr", "p2sh-p2wpkh", "p2pkh"]);
+  var chain2 = (c) => Object.freeze({ scriptTypes: ALL_TYPES, notes: Object.freeze({}), ...c });
   var NETWORKS = Object.freeze({
-    mainnet: Object.freeze({
+    // DigiByte Core. Taproot is buried-active on mainnet since block 21,168,000.
+    mainnet: chain2({
       name: "mainnet",
+      ticker: "DGB",
       label: "DigiByte mainnet",
       pubKeyHash: 30,
       // 30  -> "D..."
       scriptHash: 63,
       // 63  -> "S..."
       bech32: "dgb",
-      bip32: Object.freeze({ public: 76067358, private: 76066276 }),
-      // xpub / xprv
-      coinType: 20
-      // SLIP-44
+      bip32: XPUB,
+      coinType: 20,
+      notes: Object.freeze({
+        p2tr: "Active on DigiByte mainnet since block 21,168,000. Confirm your sending wallet/exchange supports dgb1p… (bech32m) before using.",
+        p2pkh: 'Maximum compatibility, highest fees. DigiByte and Dogecoin legacy addresses both start with "D" and look alike: never send DOGE here.'
+      })
     }),
-    testnet: Object.freeze({
+    testnet: chain2({
       name: "testnet",
+      ticker: "tDGB",
       label: "DigiByte testnet",
       pubKeyHash: 126,
       // 126
@@ -6338,7 +6346,57 @@ zoo`.split("\n"));
       bip32: Object.freeze({ public: 70617039, private: 70615956 }),
       // tpub / tprv
       coinType: 1
+    }),
+    // Bitcoin Core.
+    bitcoin: chain2({
+      name: "bitcoin",
+      ticker: "BTC",
+      label: "Bitcoin",
+      pubKeyHash: 0,
+      // "1..."
+      scriptHash: 5,
+      // "3..."
+      bech32: "bc",
+      bip32: XPUB,
+      coinType: 0
+    }),
+    // Litecoin Core. P2SH uses the newer "M..." prefix (version 50).
+    litecoin: chain2({
+      name: "litecoin",
+      ticker: "LTC",
+      label: "Litecoin",
+      pubKeyHash: 48,
+      // 48 -> "L..."
+      scriptHash: 50,
+      // 50 -> "M..."
+      bech32: "ltc",
+      bip32: XPUB,
+      coinType: 2
+    }),
+    // Dogecoin Core. No SegWit and no Taproot on Dogecoin: legacy addresses only.
+    dogecoin: chain2({
+      name: "dogecoin",
+      ticker: "DOGE",
+      label: "Dogecoin",
+      pubKeyHash: 30,
+      // 30 -> "D..." (same version byte as DigiByte)
+      scriptHash: 22,
+      // 22
+      bech32: null,
+      bip32: Object.freeze({ public: 49990397, private: 49988504 }),
+      // dgub / dgpv
+      coinType: 3,
+      scriptTypes: Object.freeze(["p2pkh"]),
+      notes: Object.freeze({
+        p2pkh: 'The only address type Dogecoin supports. Dogecoin and DigiByte legacy addresses both start with "D" and look alike: never send DGB here.'
+      })
     })
+  });
+  var CHAINS = Object.freeze({
+    dgb: NETWORKS.mainnet,
+    btc: NETWORKS.bitcoin,
+    ltc: NETWORKS.litecoin,
+    doge: NETWORKS.dogecoin
   });
   var SCRIPT_TYPES = Object.freeze([
     Object.freeze({
@@ -6354,7 +6412,7 @@ zoo`.split("\n"));
       purpose: 86,
       bip: "BIP86",
       label: "Taproot",
-      note: "Active on DigiByte mainnet since block 21,168,000. Confirm your sending wallet/exchange supports dgb1p… (bech32m) before using.",
+      note: "Confirm your sending wallet/exchange supports bech32m (…1p…) addresses before using.",
       wrap: (key) => `tr(${key})`
     }),
     Object.freeze({
@@ -6461,7 +6519,7 @@ zoo`.split("\n"));
   function checkAddress(address, network = NETWORKS.mainnet) {
     const addr = String(address).trim();
     const lower = addr.toLowerCase();
-    if (lower.startsWith(network.bech32 + "1")) {
+    if (network.bech32 && lower.startsWith(network.bech32 + "1")) {
       if (addr !== lower && addr !== addr.toUpperCase()) return { valid: false, reason: "Mixed-case bech32" };
       for (const [enc, name] of [[bech32, "bech32"], [bech32m, "bech32m"]]) {
         try {
@@ -6534,7 +6592,7 @@ zoo`.split("\n"));
     const root = HDKey.fromMasterSeed(seed, network.bip32);
     seed.fill(0);
     const masterFingerprint = fingerprintHex(root.fingerprint);
-    const scripts = SCRIPT_TYPES.map((type) => {
+    const scripts = SCRIPT_TYPES.filter((type) => network.scriptTypes.includes(type.id)).map((type) => {
       const origin = `${type.purpose}h/${network.coinType}h/${account}h`;
       const accountPath = `m/${type.purpose}'/${network.coinType}'/${account}'`;
       const acct = root.derive(accountPath);
@@ -6555,7 +6613,7 @@ zoo`.split("\n"));
         type: type.id,
         bip: type.bip,
         label: type.label,
-        note: type.note,
+        note: network.notes[type.id] || type.note,
         accountPath,
         xpub,
         descriptors: {
@@ -6617,7 +6675,7 @@ zoo`.split("\n"));
     return diffs;
   }
   var ABANDON = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-  var BTC = { ...NETWORKS.mainnet, pubKeyHash: 0, scriptHash: 5, bech32: "bc", coinType: 0 };
+  var BTC = NETWORKS.bitcoin;
   function selfTest() {
     const results = [];
     const check = (name, got, want) => results.push({ name, ok: got === want, got, want });
@@ -6656,6 +6714,15 @@ zoo`.split("\n"));
         check(`DigiByte ${s.type} address decodes`, String(res.valid), "true");
       }
     }
+    for (const [net, vectors] of Object.entries(CHAIN_VECTORS)) {
+      const w = deriveWallet(ABANDON, "", { network: NETWORKS[net], count: 1 });
+      check(`${NETWORKS[net].label} offers exactly its supported address types`, w.scripts.map((x) => x.type).sort().join(), Object.keys(vectors).sort().join());
+      for (const [type, want] of Object.entries(vectors)) {
+        const got = w.scripts.find((x) => x.type === type)?.addresses[0].address;
+        check(`${NETWORKS[net].label} ${type}`, got, want);
+        check(`${NETWORKS[net].label} ${type} address decodes`, String(checkAddress(want, NETWORKS[net]).valid), "true");
+      }
+    }
     check("Address checker rejects a typo", String(checkAddress(dgbAddr("p2wpkh").replace(/.$/, (c) => c === "q" ? "p" : "q")).valid), "false");
     return { ok: results.every((r) => r.ok), results };
   }
@@ -6664,6 +6731,15 @@ zoo`.split("\n"));
     "p2sh-p2wpkh": "SQ9EXABrHztGgefL9aH3FyeRjowdjtLfn4",
     p2wpkh: "dgb1q9gmf0pv8jdymcly6lz6fl7lf6mhslsd72e2jq8",
     p2tr: "dgb1pcevt23hht82rkdrjdpwzstmqyj4ngyy42r9cu73rl4n9h5vu6hgsx5tm5q"
+  });
+  var CHAIN_VECTORS = Object.freeze({
+    litecoin: Object.freeze({
+      p2pkh: "LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez",
+      "p2sh-p2wpkh": "M7wtsL7wSHDBJVMWWhtQfTMSYYkyooAAXM",
+      p2wpkh: "ltc1qjmxnz78nmc8nq77wuxh25n2es7rzm5c2rkk4wh",
+      p2tr: "ltc1puht8rk95c53q3u9w3pf9h3jfcutcrl9lxc7rqsdthjrse4k6sn7q9tuqm9"
+    }),
+    dogecoin: Object.freeze({ p2pkh: "DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC" })
   });
 
   // src/web/app.js

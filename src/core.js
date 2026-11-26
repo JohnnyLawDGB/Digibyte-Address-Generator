@@ -19,20 +19,34 @@ import { bytesToHex, concatBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 export const VERSION = '2.0.0';
 export { wordlist };
 
-// Values taken from DigiByte Core src/kernel/chainparams.cpp.
-// Taproot (BIP340-342) is buried-active on mainnet since block 21,168,000.
+// Chain parameters, each taken from that chain's reference node source
+// (chainparams.cpp): address version bytes, bech32 prefix, extended-key
+// version bytes, and the SLIP-44 coin type used in derivation paths.
+// `scriptTypes` lists what the chain can actually spend; anything else is
+// never offered.
+const XPUB = Object.freeze({ public: 0x0488b21e, private: 0x0488ade4 });
+const ALL_TYPES = Object.freeze(['p2wpkh', 'p2tr', 'p2sh-p2wpkh', 'p2pkh']);
+const chain = (c) => Object.freeze({ scriptTypes: ALL_TYPES, notes: Object.freeze({}), ...c });
+
 export const NETWORKS = Object.freeze({
-  mainnet: Object.freeze({
+  // DigiByte Core. Taproot is buried-active on mainnet since block 21,168,000.
+  mainnet: chain({
     name: 'mainnet',
+    ticker: 'DGB',
     label: 'DigiByte mainnet',
     pubKeyHash: 0x1e, // 30  -> "D..."
     scriptHash: 0x3f, // 63  -> "S..."
     bech32: 'dgb',
-    bip32: Object.freeze({ public: 0x0488b21e, private: 0x0488ade4 }), // xpub / xprv
-    coinType: 20, // SLIP-44
+    bip32: XPUB,
+    coinType: 20,
+    notes: Object.freeze({
+      p2tr: 'Active on DigiByte mainnet since block 21,168,000. Confirm your sending wallet/exchange supports dgb1p… (bech32m) before using.',
+      p2pkh: 'Maximum compatibility, highest fees. DigiByte and Dogecoin legacy addresses both start with "D" and look alike: never send DOGE here.',
+    }),
   }),
-  testnet: Object.freeze({
+  testnet: chain({
     name: 'testnet',
+    ticker: 'tDGB',
     label: 'DigiByte testnet',
     pubKeyHash: 0x7e, // 126
     scriptHash: 0x8c, // 140
@@ -40,6 +54,51 @@ export const NETWORKS = Object.freeze({
     bip32: Object.freeze({ public: 0x043587cf, private: 0x04358394 }), // tpub / tprv
     coinType: 1,
   }),
+  // Bitcoin Core.
+  bitcoin: chain({
+    name: 'bitcoin',
+    ticker: 'BTC',
+    label: 'Bitcoin',
+    pubKeyHash: 0x00, // "1..."
+    scriptHash: 0x05, // "3..."
+    bech32: 'bc',
+    bip32: XPUB,
+    coinType: 0,
+  }),
+  // Litecoin Core. P2SH uses the newer "M..." prefix (version 50).
+  litecoin: chain({
+    name: 'litecoin',
+    ticker: 'LTC',
+    label: 'Litecoin',
+    pubKeyHash: 0x30, // 48 -> "L..."
+    scriptHash: 0x32, // 50 -> "M..."
+    bech32: 'ltc',
+    bip32: XPUB,
+    coinType: 2,
+  }),
+  // Dogecoin Core. No SegWit and no Taproot on Dogecoin: legacy addresses only.
+  dogecoin: chain({
+    name: 'dogecoin',
+    ticker: 'DOGE',
+    label: 'Dogecoin',
+    pubKeyHash: 0x1e, // 30 -> "D..." (same version byte as DigiByte)
+    scriptHash: 0x16, // 22
+    bech32: null,
+    bip32: Object.freeze({ public: 0x02facafd, private: 0x02fac398 }), // dgub / dgpv
+    coinType: 3,
+    scriptTypes: Object.freeze(['p2pkh']),
+    notes: Object.freeze({
+      p2pkh: 'The only address type Dogecoin supports. Dogecoin and DigiByte legacy addresses both start with "D" and look alike: never send DGB here.',
+    }),
+  }),
+});
+
+/** Short names accepted on the command line, DigiByte first. */
+export const CHAINS = Object.freeze({
+  dgb: NETWORKS.mainnet,
+  btc: NETWORKS.bitcoin,
+  ltc: NETWORKS.litecoin,
+  doge: NETWORKS.dogecoin,
 });
 
 // Ordered newest-first: the first entry is the recommended default.
@@ -57,7 +116,7 @@ export const SCRIPT_TYPES = Object.freeze([
     purpose: 86,
     bip: 'BIP86',
     label: 'Taproot',
-    note: 'Active on DigiByte mainnet since block 21,168,000. Confirm your sending wallet/exchange supports dgb1p… (bech32m) before using.',
+    note: 'Confirm your sending wallet/exchange supports bech32m (…1p…) addresses before using.',
     wrap: (key) => `tr(${key})`,
   }),
   Object.freeze({
@@ -204,7 +263,7 @@ export function encodeAddress(typeId, pubkey33, network) {
 export function checkAddress(address, network = NETWORKS.mainnet) {
   const addr = String(address).trim();
   const lower = addr.toLowerCase();
-  if (lower.startsWith(network.bech32 + '1')) {
+  if (network.bech32 && lower.startsWith(network.bech32 + '1')) {
     if (addr !== lower && addr !== addr.toUpperCase()) return { valid: false, reason: 'Mixed-case bech32' };
     for (const [enc, name] of [[bech32, 'bech32'], [bech32m, 'bech32m']]) {
       try {
@@ -297,7 +356,7 @@ export function deriveWallet(mnemonic, passphrase = '', opts = {}) {
   seed.fill(0);
   const masterFingerprint = fingerprintHex(root.fingerprint);
 
-  const scripts = SCRIPT_TYPES.map((type) => {
+  const scripts = SCRIPT_TYPES.filter((type) => network.scriptTypes.includes(type.id)).map((type) => {
     const origin = `${type.purpose}h/${network.coinType}h/${account}h`;
     const accountPath = `m/${type.purpose}'/${network.coinType}'/${account}'`;
     const acct = root.derive(accountPath);
@@ -318,7 +377,7 @@ export function deriveWallet(mnemonic, passphrase = '', opts = {}) {
       type: type.id,
       bip: type.bip,
       label: type.label,
-      note: type.note,
+      note: network.notes[type.id] || type.note,
       accountPath,
       xpub,
       descriptors: {
@@ -391,7 +450,7 @@ export function compareToKit(wallet, kit) {
 // --------------------------------------------------------------- selftest
 
 const ABANDON = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
-const BTC = { ...NETWORKS.mainnet, pubKeyHash: 0x00, scriptHash: 0x05, bech32: 'bc', coinType: 0 };
+const BTC = NETWORKS.bitcoin;
 
 /**
  * Known-answer tests run before any key is generated. A corrupted download,
@@ -444,6 +503,16 @@ export function selfTest() {
       check(`DigiByte ${s.type} address decodes`, String(res.valid), 'true');
     }
   }
+  // Litecoin and Dogecoin vectors (cross-checked against bitcoinjs-lib)
+  for (const [net, vectors] of Object.entries(CHAIN_VECTORS)) {
+    const w = deriveWallet(ABANDON, '', { network: NETWORKS[net], count: 1 });
+    check(`${NETWORKS[net].label} offers exactly its supported address types`, w.scripts.map((x) => x.type).sort().join(), Object.keys(vectors).sort().join());
+    for (const [type, want] of Object.entries(vectors)) {
+      const got = w.scripts.find((x) => x.type === type)?.addresses[0].address;
+      check(`${NETWORKS[net].label} ${type}`, got, want);
+      check(`${NETWORKS[net].label} ${type} address decodes`, String(checkAddress(want, NETWORKS[net]).valid), 'true');
+    }
+  }
   check('Address checker rejects a typo', String(checkAddress(dgbAddr('p2wpkh').replace(/.$/, (c) => (c === 'q' ? 'p' : 'q'))).valid), 'false');
 
   return { ok: results.every((r) => r.ok), results };
@@ -454,4 +523,14 @@ export const DGB_VECTORS = Object.freeze({
   'p2sh-p2wpkh': 'SQ9EXABrHztGgefL9aH3FyeRjowdjtLfn4',
   p2wpkh: 'dgb1q9gmf0pv8jdymcly6lz6fl7lf6mhslsd72e2jq8',
   p2tr: 'dgb1pcevt23hht82rkdrjdpwzstmqyj4ngyy42r9cu73rl4n9h5vu6hgsx5tm5q',
+});
+
+export const CHAIN_VECTORS = Object.freeze({
+  litecoin: Object.freeze({
+    p2pkh: 'LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez',
+    'p2sh-p2wpkh': 'M7wtsL7wSHDBJVMWWhtQfTMSYYkyooAAXM',
+    p2wpkh: 'ltc1qjmxnz78nmc8nq77wuxh25n2es7rzm5c2rkk4wh',
+    p2tr: 'ltc1puht8rk95c53q3u9w3pf9h3jfcutcrl9lxc7rqsdthjrse4k6sn7q9tuqm9',
+  }),
+  dogecoin: Object.freeze({ p2pkh: 'DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC' }),
 });

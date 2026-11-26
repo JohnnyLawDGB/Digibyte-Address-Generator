@@ -25,6 +25,9 @@ yet been confirmed on real hardware. Do not use it for real funds yet.
 - **Dice are mandatory.** A freshly booted device has had little time to
   gather randomness, so the ceremony requires a full set of dice rolls, mixed
   with the system generator.
+- **DigiByte first, four chains.** One seed produces DigiByte, Bitcoin,
+  Litecoin and Dogecoin addresses, shown one chain per screen with DigiByte
+  leading.
 - **24 words, or 24 + 1.** The menu offers a 24-word seed on its own, or a
   24-word seed with a passphrase (the "25th word"), which is then required.
 
