@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Boot the HoldFast Vault userland in QEMU and drive it over the serial console.
+
+Usage: qemu-boot.py path/to/Image
+
+Checks that the system boots straight into the HoldFast menu with no login or
+shell, that the tool's self-test passes on the target, that the kernel has no
+network interface other than loopback, and that a full ceremony and recovery
+drill complete.
+"""
+import os
+import re
+import select
+import subprocess
+import sys
+import time
+
+image = sys.argv[1]
+qemu = subprocess.Popen(
+    ["qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a72", "-smp", "2", "-m", "1024",
+     "-nographic", "-no-reboot", "-nic", "none", "-kernel", image,
+     "-append", "console=ttyAMA0 quiet"],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+os.set_blocking(qemu.stdout.fileno(), False)
+buf = ""
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def fail(msg):
+    print("\n--- console tail ---\n" + ANSI.sub("", buf)[-3000:])
+    qemu.kill()
+    sys.exit("FAIL: " + msg)
+
+
+def until(pattern, timeout=180, start=0):
+    global buf
+    end = time.time() + timeout
+    while time.time() < end:
+        m = re.search(pattern, ANSI.sub("", buf[start:]))
+        if m:
+            return m
+        if select.select([qemu.stdout], [], [], 0.5)[0]:
+            chunk = qemu.stdout.read()
+            if chunk:
+                buf += chunk.decode(errors="replace")
+        if qemu.poll() is not None:
+            fail("QEMU exited while waiting for %r" % pattern)
+    fail("timed out waiting for %r" % pattern)
+
+
+def send(text):
+    qemu.stdin.write((text + "\r").encode())
+    qemu.stdin.flush()
+
+
+def step(name):
+    print("ok   " + name, flush=True)
+
+
+until(r"Choose 1-5: ")
+step("boots straight into the HoldFast menu")
+if re.search(r"login:|[#$] $", ANSI.sub("", buf)):
+    fail("a login prompt or shell appeared")
+step("no login prompt or shell")
+
+mark = len(buf)
+send("4")
+until(r"\d+ checks passed", start=mark)
+step("tool self-test passes on the target")
+send("")
+
+mark = len(buf)
+until(r"Choose 1-5: ", start=mark)
+mark = len(buf)
+send("1")
+until(r"No active network interfaces", start=mark)
+step("tool sees no network interface")
+until(r"Dice rolls: ", start=mark)
+send("")
+until(r"requires at least 100 real dice rolls", start=mark)
+step("dice rolls are mandatory")
+mark2 = len(buf)
+send("1234561234" * 10)
+until(r"BIP39 passphrase[^\n]*: ", start=mark2)
+send("")
+until(r"Press Enter when you have written", start=mark2)
+text = ANSI.sub("", buf[mark2:])
+words = [w for _, w in sorted((int(n), w) for n, w in re.findall(r"(\d+)\. ([a-z]+)", text))]
+if len(words) != 24:
+    fail("expected 24 seed words, saw %d" % len(words))
+fp = re.search(r"Master fingerprint: ([0-9a-f]{8})", text).group(1)
+send("")
+until(r"Seed phrase: ", start=mark2)
+send(" ".join(words))
+m = until(r"  0  (dgb1q[a-z0-9]+)", start=mark2)
+first = m.group(1)
+until(r"Press Enter to clear the screen and exit", start=mark2)
+send("")
+step("ceremony completes (fingerprint %s)" % fp)
+
+mark = len(buf)
+until(r"Choose 1-5: ", start=mark)
+mark = len(buf)
+send("2")
+until(r"Seed phrase: ", start=mark)
+send(" ".join(words))
+until(r"BIP39 passphrase[^\n]*: ", start=mark)
+send("")
+until(r"Master fingerprint:\s+%s" % fp, start=mark)
+until(re.escape(first), start=mark)
+step("recovery drill reproduces the same fingerprint and address")
+until(r"Press Enter to clear the screen and exit", start=mark)
+send("")
+
+mark = len(buf)
+until(r"Choose 1-5: ", start=mark)
+send("5")
+try:
+    qemu.wait(timeout=60)
+except subprocess.TimeoutExpired:
+    fail("did not power off")
+step("powers off from the menu")
+print("PASS")

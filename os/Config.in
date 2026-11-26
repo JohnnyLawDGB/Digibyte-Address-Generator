@@ -1,0 +1,2 @@
+source "$BR2_EXTERNAL_HOLDFAST_PATH/package/holdfast-node/Config.in"
+source "$BR2_EXTERNAL_HOLDFAST_PATH/package/holdfast-vault/Config.in"

@@ -1,0 +1,9 @@
+config BR2_PACKAGE_HOLDFAST_NODE
+	bool "holdfast-node"
+	depends on BR2_aarch64
+	depends on BR2_TOOLCHAIN_USES_GLIBC
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  The official Node.js release binary for linux-arm64, pinned
+	  by the SHA-256 published in nodejs.org's SHASUMS256.txt.
+	  Only the `node` executable is installed: no npm, no headers.

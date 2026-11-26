@@ -1,0 +1,13 @@
+# HoldFast Vault boot configuration for Raspberry Pi 4 / Pi 400.
+start_file=start4.elf
+fixup_file=fixup4.dat
+kernel=Image
+arm_64bit=1
+disable_overscan=1
+
+# Radios off at the firmware level as well as absent from the kernel.
+dtoverlay=disable-wifi
+dtoverlay=disable-bt
+
+# No serial console: the only way in is the HDMI screen and a USB keyboard.
+enable_uart=0

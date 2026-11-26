@@ -1,0 +1,52 @@
+name: HoldFast Vault image
+on:
+  push:
+    paths:
+      - 'os/**'
+      - 'dist/**'
+      - '.github/workflows/os-image.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [qemu, rpi4]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential bc cpio rsync unzip file wget curl xz-utils libssl-dev python3 qemu-system-arm
+      - name: Cache downloaded sources
+        uses: actions/cache@v4
+        with:
+          path: os/.work/dl
+          key: holdfast-dl-${{ matrix.target }}-${{ hashFiles('os/build.sh', 'os/configs/*', 'os/package/**') }}
+          restore-keys: holdfast-dl-${{ matrix.target }}-
+      - name: Build
+        run: os/build.sh ${{ matrix.target }}
+      - name: Boot test in QEMU
+        if: matrix.target == 'qemu'
+        run: python3 os/test/qemu-boot.py os/output/qemu/images/Image
+      - name: Package Raspberry Pi image
+        if: matrix.target == 'rpi4'
+        run: |
+          cd os/output/rpi4/images
+          cat holdfast-vault-rpi4.img.sha256
+          xz -T0 -6 holdfast-vault-rpi4.img
+          sha256sum holdfast-vault-rpi4.img.xz | tee holdfast-vault-rpi4.img.xz.sha256
+      - name: Upload Raspberry Pi image
+        if: matrix.target == 'rpi4'
+        uses: actions/upload-artifact@v4
+        with:
+          name: holdfast-vault-rpi4
+          path: |
+            os/output/rpi4/images/holdfast-vault-rpi4.img.xz
+            os/output/rpi4/images/holdfast-vault-rpi4.img.xz.sha256
+            os/output/rpi4/images/holdfast-vault-rpi4.img.sha256
+          if-no-files-found: error

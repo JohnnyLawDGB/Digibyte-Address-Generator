@@ -1,0 +1,52 @@
+#!/bin/sh
+# The only thing a HoldFast Vault console can run. There is no login and no
+# shell: this menu is started directly by init and restarted if it exits.
+
+APP=/opt/holdfast/dgb-coldprep.cjs
+trap '' INT QUIT TSTP HUP
+
+pause() {
+	printf '\nPress Enter to return to the menu… '
+	read -r _
+}
+
+while :; do
+	clear
+	cat <<'BANNER'
+
+  HoldFast Vault
+  Air-gapped cold storage. This device has no network hardware enabled,
+  runs entirely from memory, and forgets everything when powered off.
+
+    1) Create a new cold-storage seed
+    2) Recovery drill (check a written backup)
+    3) Check an address
+    4) Self-test
+    5) Power off
+
+BANNER
+	printf '  Choose 1-5: '
+	read -r choice || exit 0
+	clear
+	case "$choice" in
+	1) node "$APP" --require-dice --no-kit || pause ;;
+	2) node "$APP" verify || pause ;;
+	3)
+		printf 'Address: '
+		read -r addr
+		node "$APP" check-address "$addr"
+		pause
+		;;
+	4)
+		node "$APP" selftest
+		pause
+		;;
+	5)
+		clear
+		echo 'Powering off. Remove power once the screen goes blank.'
+		poweroff -f
+		sleep 30
+		;;
+	*) continue ;;
+	esac
+done

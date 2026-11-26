@@ -1,0 +1,22 @@
+# One FAT partition holding the firmware and a kernel with the whole system
+# embedded in it. There is no root partition: nothing is ever written back.
+image boot.vfat {
+	vfat {
+		files = {
+#BOOT_FILES#
+		}
+	}
+
+	size = 256M
+}
+
+image holdfast-vault-rpi4.img {
+	hdimage {
+	}
+
+	partition boot {
+		partition-type = 0xC
+		bootable = "true"
+		image = "boot.vfat"
+	}
+}

@@ -101,7 +101,7 @@ dgb-coldprep selftest             run the known-answer tests
 ```
 
 Options: `--words 12|24`, `--count N`, `--account N`, `--testnet`,
-`--no-dice`, `--dice-only`, `--no-passphrase`, `--quick-verify`, `--out DIR`,
+`--no-dice`, `--dice-only`, `--require-dice`, `--no-passphrase`, `--quick-verify`, `--out DIR`,
 `--no-kit`, `--show-descriptors`. Run `--help` for details.
 
 `--allow-online` and `--unsafe-no-tty` exist for practice and automated tests
@@ -137,6 +137,12 @@ npm run build       # regenerate dist/ and SHA256SUMS
 
 Network parameters come from DigiByte Core `src/kernel/chainparams.cpp`.
 DigiByte test vectors were cross-checked against `bitcoinjs-lib` 6.
+
+## HoldFast Vault OS
+
+[`os/`](os/README.md) builds a bootable Raspberry Pi 4 image that runs this
+tool and nothing else: no network stack, no login, no storage writes. It is an
+early skeleton and not yet proven on hardware.
 
 ## License
 

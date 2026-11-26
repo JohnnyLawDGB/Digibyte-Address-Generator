@@ -143,3 +143,19 @@ test('a failed backup check discards the seed and writes nothing', async () => {
   assert.deepEqual(fs.readdirSync(dir), []);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('--require-dice insists on a full set of rolls', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldprep-'));
+  let asked = 0;
+  const res = await drive([...TEST_FLAGS, '--require-dice', '--no-passphrase', '--no-kit', '--words', '12'], dir, (line) => {
+    if (line.startsWith('Dice rolls:')) return ['', '123456', '1'.repeat(60), '1234561234'.repeat(5)][asked++];
+    if (line.startsWith('Press Enter when you have written')) return '';
+    if (line.startsWith('Seed phrase:')) return 'x';
+    return null;
+  });
+  assert.equal(asked, 4);
+  assert.equal((res.stdout.match(/requires at least 50 real dice rolls/g) || []).length, 3);
+  assert.match(res.stdout, /system RNG \+ 50 dice rolls/);
+  assert.equal(run(['--require-dice', '--no-dice']).status, 2);
+  fs.rmSync(dir, { recursive: true });
+});

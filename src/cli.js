@@ -39,6 +39,8 @@ Ceremony options:
   --testnet            Derive for DigiByte testnet
   --no-dice            Do not ask for dice rolls (system RNG only)
   --dice-only          Derive entropy only from dice (auditable by hand)
+  --require-dice       Refuse to continue without a full set of dice rolls,
+                       mixed with the system RNG (for freshly booted devices)
   --no-passphrase      Do not ask for a BIP39 passphrase
   --quick-verify       Quiz 4 random words instead of retyping the whole phrase
   --out DIR            Write the public watch-only kit to DIR without asking
@@ -71,6 +73,7 @@ function parseArgs(argv) {
     '--testnet': 'testnet',
     '--no-dice': 'noDice',
     '--dice-only': 'diceOnly',
+    '--require-dice': 'requireDice',
     '--no-passphrase': 'noPassphrase',
     '--quick-verify': 'quickVerify',
     '--no-kit': 'noKit',
@@ -100,6 +103,7 @@ function parseArgs(argv) {
   if (!Number.isInteger(opts.count) || opts.count < 1 || opts.count > 1000) throw new Error('--count must be 1-1000');
   if (!Number.isInteger(opts.account) || opts.account < 0) throw new Error('--account must be a non-negative integer');
   if (opts.diceOnly && opts.noDice) throw new Error('--dice-only and --no-dice are mutually exclusive');
+  if (opts.requireDice && (opts.noDice || opts.diceOnly)) throw new Error('--require-dice cannot be combined with --no-dice or --dice-only');
   if (opts.out && opts.noKit) throw new Error('--out and --no-kit are mutually exclusive');
   return opts;
 }
@@ -326,7 +330,7 @@ async function gatherEntropy(term, opts) {
   } else {
     out('The seed comes from the system random number generator. To avoid trusting it alone,');
     out(`roll a die and type the results (digits 1-6; ${fullRolls} rolls = full ${bits}-bit strength).`);
-    out('Your rolls are hashed together with the system RNG. Press Enter to skip.');
+    out(`Your rolls are hashed together with the system RNG.${opts.requireDice ? '' : ' Press Enter to skip.'}`);
   }
   for (;;) {
     let dice;
@@ -348,6 +352,10 @@ async function gatherEntropy(term, opts) {
         out(red(e.message));
         continue;
       }
+    }
+    if (opts.requireDice && (dice.length < fullRolls || new Set(dice).size < 4)) {
+      out(red(`This device requires at least ${fullRolls} real dice rolls (got ${dice.length}${dice.length >= fullRolls ? ', and they do not look random' : ''}).`));
+      continue;
     }
     if (!dice) return { entropy: mixEntropy(nodeCrypto.randomBytes(64), null, bits), source: 'system RNG' };
     if (dice.length < fullRolls) {

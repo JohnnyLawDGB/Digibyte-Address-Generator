@@ -1,0 +1,7 @@
+config BR2_PACKAGE_HOLDFAST_VAULT
+	bool "holdfast-vault"
+	depends on BR2_PACKAGE_HOLDFAST_NODE
+	help
+	  The dgb-coldprep single-file bundle from this repository's
+	  dist/ directory, checked against dist/SHA256SUMS at build
+	  time, plus the console session that replaces a login shell.

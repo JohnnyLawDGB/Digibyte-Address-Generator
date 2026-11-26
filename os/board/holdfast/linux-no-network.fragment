@@ -1,0 +1,25 @@
+# HoldFast Vault: no way onto a network.
+# The core socket layer stays (local UNIX sockets), but there is no TCP/IP,
+# no network device driver of any kind, and no radio stack.
+# CONFIG_INET is not set
+# CONFIG_NETDEVICES is not set
+# CONFIG_ETHERNET is not set
+# CONFIG_WLAN is not set
+# CONFIG_WIRELESS is not set
+# CONFIG_CFG80211 is not set
+# CONFIG_MAC80211 is not set
+# CONFIG_BT is not set
+# CONFIG_NFC is not set
+# CONFIG_CAN is not set
+# CONFIG_RFKILL is not set
+# CONFIG_USB_NET_DRIVERS is not set
+# CONFIG_USB_GADGET is not set
+# CONFIG_NET_9P is not set
+# CONFIG_NFS_FS is not set
+# CONFIG_CIFS is not set
+# CONFIG_PACKET is not set
+# No swap, no hibernation: secrets in memory never reach storage.
+# CONFIG_SWAP is not set
+# CONFIG_HIBERNATION is not set
+# CONFIG_KEXEC is not set
+# CONFIG_COREDUMP is not set
