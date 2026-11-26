@@ -12,6 +12,7 @@ backed out of, that the tool's self-test passes on the target, that the kernel
 has no network interface other than loopback, and that a full ceremony and
 recovery drill complete.
 """
+import codecs
 import os
 import re
 import select
@@ -39,6 +40,9 @@ qemu = subprocess.Popen(
 os.set_blocking(qemu.stdout.fileno(), False)
 buf = ""
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Serial reads are small, so a multi-byte character (the QR blocks, "…", "✔")
+# often arrives split across two reads. Decode the stream, not each read.
+utf8 = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
 
 def fail(msg):
@@ -57,7 +61,7 @@ def until(pattern, timeout=180, start=0):
         if select.select([qemu.stdout], [], [], 0.5)[0]:
             chunk = qemu.stdout.read()
             if chunk:
-                buf += chunk.decode(errors="replace")
+                buf += utf8.decode(chunk)
         if qemu.poll() is not None:
             fail("QEMU exited while waiting for %r" % pattern)
     fail("timed out waiting for %r" % pattern)
